@@ -1,0 +1,1 @@
+bbb_mnist_adam: 1 epoch on full MNIST training set, batch size=5, pi=0.5, sigma_1=e^-1, sigma_2=e^-7, test accuracy 92.29%
