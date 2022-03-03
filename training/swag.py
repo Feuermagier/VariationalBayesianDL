@@ -42,5 +42,4 @@ class SWAGWrapper:
         for sample in range(samples):
             torch.nn.utils.convert_parameters.vector_to_parameters(dist.sample(), model.parameters())
             outputs[sample] = model(input)
-        mean = outputs.sum() / samples
-        return mean, ((outputs - mean)**2).sum() / (samples - 1)
+        return torch.mean(outputs), torch.var(outputs)

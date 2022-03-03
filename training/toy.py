@@ -23,6 +23,9 @@ class CubicToyDataset(torch.utils.data.IterableDataset):
     def __iter__(self):
         return iter(self.samples)
 
+    def __len__(self):
+        return len(self.samples)
+
 def _sample_from_fn(rng: np.random.Generator, function, min, max, sample_count, noise_sigma):
     xs = rng.uniform(min, max, sample_count)
     ys = function(xs) + rng.normal(loc=0, scale=noise_sigma, size=sample_count)
