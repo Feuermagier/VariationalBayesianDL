@@ -31,15 +31,15 @@ class SWAGWrapper:
             self.deviations = torch.roll(self.deviations, -1, 1)
             self.deviations[:,-1] = params
 
-    # Returns average, std dev
+    # Returns average, variance
     def sample(self, input: torch.Tensor, samples: int, model: nn.Module, output_dim: int):
         if samples == 0:
             torch.nn.utils.convert_parameters.vector_to_parameters(self.mean, model.parameters())
             return model(input), torch.tensor(0)
 
-        outputs = torch.zeros((samples, output_dim))
+        outputs = torch.zeros((input.shape[0], samples, output_dim))
         dist = torch.distributions.MultivariateNormal(self.mean, self.covariance)
         for sample in range(samples):
             torch.nn.utils.convert_parameters.vector_to_parameters(dist.sample(), model.parameters())
-            outputs[sample] = model(input)
-        return torch.mean(outputs), torch.var(outputs)
+            outputs[:,sample] = model(input)
+        return torch.mean(outputs, dim=1), torch.var(outputs, dim=1)

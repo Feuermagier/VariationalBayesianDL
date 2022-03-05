@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 # See arXiv:1502.05336 (also used in arXiv:1612.01474)
-class CubicToyDataset(torch.utils.data.IterableDataset):
+class CubicToyDataset(torch.utils.data.Dataset):
     def __init__(self, min: float = -4, max: float = 4, sample_count: int = 20, normalize: bool = True, noise: float = 3, rng=None):
         super().__init__()
         if rng is None:
@@ -25,6 +25,12 @@ class CubicToyDataset(torch.utils.data.IterableDataset):
 
     def __len__(self):
         return len(self.samples)
+
+    def __getitem__(self, key):
+        return self.samples[key]
+
+    def eval_value(self, value):
+        return value**3
 
 def _sample_from_fn(rng: np.random.Generator, function, min, max, sample_count, noise_sigma):
     xs = rng.uniform(min, max, sample_count)
