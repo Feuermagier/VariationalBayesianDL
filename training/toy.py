@@ -1,24 +1,26 @@
 import torch
 import numpy as np
 
-# See arXiv:1502.05336 (also used in arXiv:1612.01474)
-class CubicToyDataset(torch.utils.data.Dataset):
-    def __init__(self, min: float = -4, max: float = 4, sample_count: int = 20, normalize: bool = True, noise: float = 3, rng=None):
+class RegressionToyDataset(torch.utils.data.Dataset):
+    def __init__(self, min: float, max: float, sample_count: int, normalize: bool, noise: float):
         super().__init__()
-        if rng is None:
-            rng = np.random.default_rng()
 
         if normalize:
             self.x_norm = 1 / np.abs(max)
-            self.y_norm = 1 / np.abs(max ** 3)
+            self.y_norm = 1 / np.abs(self.eval_value(torch.tensor(max)))
         else:
             self.x_norm = 1
             self.y_norm = 1
 
-        xs, ys = _sample_from_fn(
-            rng, lambda x: x**3, min, max, sample_count, noise)
+        xs, ys = _sample_from_fn(self.eval, min, max, sample_count, noise)
         xs, ys = torch.unsqueeze(xs, -1) * self.x_norm, torch.unsqueeze(ys, -1) * self.y_norm
         self.samples = [(x, y) for x, y in zip(xs, ys)] # Just using zip() doesn't work for some reason
+
+    def eval_value(self, value):
+        if isinstance(value, torch.Tensor):
+            return self.eval(value, torch.zeros(value.shape))
+        else:
+            return self.eval(value, 0)
 
     def __iter__(self):
         return iter(self.samples)
@@ -29,10 +31,23 @@ class CubicToyDataset(torch.utils.data.Dataset):
     def __getitem__(self, key):
         return self.samples[key]
 
-    def eval_value(self, value):
-        return value**3
+# See arXiv:1502.05336 (also used in arXiv:1612.01474)
+class CubicToyDataset(RegressionToyDataset):
+    def __init__(self, min: float = -4, max: float = 4, sample_count: int = 20, normalize: bool = True, noise: float = 3):
+        super().__init__(min, max, sample_count, normalize, noise)
 
-def _sample_from_fn(rng: np.random.Generator, function, min, max, sample_count, noise_sigma):
-    xs = rng.uniform(min, max, sample_count)
-    ys = function(xs) + rng.normal(loc=0, scale=noise_sigma, size=sample_count)
-    return torch.from_numpy(xs).float(), torch.from_numpy(ys).float()
+    def eval(self, value, noise):
+        return value**3 + noise
+
+class TrigonometricToyDataset(RegressionToyDataset):
+    def __init__(self, min: float = 0, max: float = 0.5, sample_count: int = 20, normalize: bool = False, noise: float = 0.02):
+        super().__init__(min, max, sample_count, normalize, noise)
+
+    def eval(self, value, noise):
+        return value + 0.3*torch.sin(2*torch.pi*(value + noise)) + 0.3*torch.sin(4*torch.pi*(value + noise)) + noise
+
+def _sample_from_fn(function, min, max, sample_count, noise_sigma):
+    xs = (max - min) * torch.rand(sample_count) + min
+    noise = torch.normal(mean=torch.zeros(sample_count), std=torch.full((sample_count,), noise_sigma))
+    ys = function(xs, noise)
+    return xs.float(), ys.float()
