@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def combined_variance_output(input: torch.Tensor, ensemble: list[nn.Module]) -> tuple[torch.Tensor, torch.Tensor]:
+def combined_variance_output(input, ensemble):
     means = torch.zeros((input.shape[0], len(ensemble)))
     variances = torch.zeros((input.shape[0], len(ensemble)))
     for i, model in enumerate(ensemble):
