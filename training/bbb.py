@@ -32,7 +32,7 @@ class BBBLinear(nn.Module):
     def __init__(self, in_features: int, out_features: int, weight_prior, bias_prior, device: torch.device, **kwargs):
         super().__init__()
         self.is_bayesian = True
-        self.sampling = kwargs.get("sampling", "local_reparametrization")
+        self.sampling = kwargs.get("sampling", "activations")
         self.deterministic_eval = kwargs.get("deterministic_eval", False)
         self.mc_sample = kwargs.get("mc_sample", 1)
         self.device = device
@@ -50,26 +50,34 @@ class BBBLinear(nn.Module):
         self.bias_mu = nn.Parameter(torch.Tensor(out_features).uniform_(-0.1, 0.1))
         self.bias_rho = nn.Parameter(torch.Tensor(self.out_features).uniform_(-3, -2))
 
+        self.kl = 0
+
     def sample_parameters(self, mu, rho):
         epsilon = torch.empty(mu.shape).normal_(0, 1).to(self.device)
         return mu + to_sigma(rho) * epsilon
 
     def forward(self, input: torch.Tensor):
+        self.kl = 0
         if not self.training and self.deterministic_eval:
             weight = self.weight_mu
             bias = self.bias_mu
-            self.kl = 0
             return F.linear(input, weight, bias)
         elif self.sampling == "parameters":
-            weight = self.sample_parameters(self.weight_mu, self.weight_rho)
-            bias = self.sample_parameters(self.bias_mu, self.bias_rho)
+            output = torch.zeros((input.shape[0], self.out_features))
 
-            log_prior = self.weight_prior.log_prob(weight).sum() + self.bias_prior.log_prob(bias).sum()
-            log_posterior = log_prob(self.weight_mu, self.weight_rho, weight).sum() + log_prob(self.bias_mu, self.bias_rho, bias).sum()
-            self.kl = log_posterior - log_prior
+            for i in range(self.mc_sample):
+                weight = self.sample_parameters(self.weight_mu, self.weight_rho)
+                bias = self.sample_parameters(self.bias_mu, self.bias_rho)
 
-            return F.linear(input, weight, bias)
-        elif self.sampling == "local_reparametrization":
+                log_prior = self.weight_prior.log_prob(weight).sum() + self.bias_prior.log_prob(bias).sum()
+                log_posterior = log_prob(self.weight_mu, self.weight_rho, weight).sum() + log_prob(self.bias_mu, self.bias_rho, bias).sum()
+                self.kl += log_posterior - log_prior
+
+                output += F.linear(input, weight, bias)
+
+            self.kl /= self.mc_sample
+            return output / self.mc_sample
+        elif self.sampling == "activations":
             activation_mu = F.linear(input, self.weight_mu, self.bias_mu)
             activation_var = F.linear(input**2, to_sigma(self.weight_rho)**2, to_sigma(self.bias_rho)**2)
             activation_std = torch.sqrt(activation_var)
@@ -77,12 +85,12 @@ class BBBLinear(nn.Module):
             log_prior = self.weight_prior.log_prob(self.weight_mu).sum() + self.bias_prior.log_prob(self.bias_mu).sum() 
             self.kl = -log_prior
 
-            output = torch.empty((self.mc_sample, input.shape[0], self.out_features))
+            output = torch.zeros((input.shape[0], self.out_features))
             for i in range(self.mc_sample):
                 epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
-                output[i] = activation_mu + activation_std * epsilon
+                output += activation_mu + activation_std * epsilon
             
-            return torch.mean(output, dim=0)
+            return output / self.mc_sample
         else:
             raise ValueError("Invalid value of weight_draw")
 
