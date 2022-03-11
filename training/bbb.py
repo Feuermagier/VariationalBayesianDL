@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from socket import NI_MAXSERV
 import numpy as np
 import torch
 import torch.nn as nn
@@ -25,24 +27,28 @@ def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_f
         epoch_loss += loss.cpu()
     return epoch_loss
 
+
 class BBBLinear(nn.Module):
-    def __init__(self, in_features: int, out_features: int, weight_prior, bias_prior: GaussianMixture, device: torch.device, **kwargs):
+    def __init__(self, in_features: int, out_features: int, weight_prior, bias_prior, device: torch.device, **kwargs):
         super().__init__()
+        self.is_bayesian = True
         self.sampling = kwargs.get("sampling", "local_reparametrization")
         self.deterministic_eval = kwargs.get("deterministic_eval", False)
+        self.mc_sample = kwargs.get("mc_sample", 1)
         self.device = device
+        self.out_features, self.in_features = out_features, in_features
 
         self.in_features, self.out_features = in_features, out_features
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
         self.log_prior, self.log_posterior = 0, 0
 
         # Weights
-        self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features).uniform_(-0.1, 0.1))
-        self.weight_rho = nn.Parameter(torch.Tensor(out_features, in_features).uniform_(-3, -2))
+        self.weight_mu = nn.Parameter(torch.Tensor(self.out_features, self.in_features).uniform_(-0.1, 0.1))
+        self.weight_rho = nn.Parameter(torch.Tensor(self.out_features, self.in_features).uniform_(-3, -2))
 
         # Biases
         self.bias_mu = nn.Parameter(torch.Tensor(out_features).uniform_(-0.1, 0.1))
-        self.bias_rho = nn.Parameter(torch.Tensor(out_features).uniform_(-3, -2))
+        self.bias_rho = nn.Parameter(torch.Tensor(self.out_features).uniform_(-3, -2))
 
     def sample_parameters(self, mu, rho):
         epsilon = torch.empty(mu.shape).normal_(0, 1).to(self.device)
@@ -68,12 +74,15 @@ class BBBLinear(nn.Module):
             activation_var = F.linear(input**2, to_sigma(self.weight_rho)**2, to_sigma(self.bias_rho)**2)
             activation_std = torch.sqrt(activation_var)
             
-            # The following line is extremely expensive
             log_prior = self.weight_prior.log_prob(self.weight_mu).sum() + self.bias_prior.log_prob(self.bias_mu).sum() 
             self.kl = -log_prior
 
-            epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
-            return activation_mu + activation_std * epsilon
+            output = torch.empty((self.mc_sample, input.shape[0], self.out_features))
+            for i in range(self.mc_sample):
+                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
+                output[i] = activation_mu + activation_std * epsilon
+            
+            return torch.mean(output, dim=0)
         else:
             raise ValueError("Invalid value of weight_draw")
 
@@ -83,3 +92,9 @@ def to_sigma(rho):
 def log_prob(mu, rho, value):
     sigma = to_sigma(rho)
     return -((value - mu)**2) / (2 * sigma**2) - sigma.log() - math.log(math.sqrt(2 * math.pi))
+
+# Closed form KL divergence for gaussians
+# See https://github.com/kumar-shridhar/PyTorch-BayesianCNN/blob/master/metrics.py
+def gauss_kl(mu_q, sig_q, mu_p, sig_p):
+    kl = 0.5 * (2 * torch.log(sig_p / sig_q) - 1 + (sig_q / sig_p).pow(2) + ((mu_p - mu_q) / sig_p).pow(2)).sum()
+    return kl
