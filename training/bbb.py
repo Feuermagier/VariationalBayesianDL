@@ -95,7 +95,7 @@ class BBBLinear(nn.Module):
             raise ValueError("Invalid value of weight_draw")
 
 def to_sigma(rho):
-    return torch.log1p(torch.exp(rho)) + 1e-6
+    return F.softplus(rho) + 1e-6
 
 def log_prob(mu, rho, value):
     sigma = to_sigma(rho)
