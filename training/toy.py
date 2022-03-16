@@ -35,28 +35,41 @@ class RegressionToyDataset(torch.utils.data.Dataset):
     def __getitem__(self, key):
         return self.samples[key]
 
-    def plot(self, eval_fn):
-        extra = (self.max - self.min) * 0.5
+    def plot(self, name, eval_fn, extra_range=0.01, plot_sigma=False):
+        plt.title(name)
+        extra = (self.max - self.min) * extra_range
         min, max = self.min - extra, self.max + extra
         #plt.xlim(min, max)
         t = torch.linspace(min, max, 50)
 
+        with torch.no_grad():
+            outputs = eval_fn(torch.unsqueeze(t * self.x_norm, -1))
+        
+        means = torch.empty((len(outputs), t.shape[0]))
+        mses = torch.empty((len(outputs)))
+        for i, (mean, variance) in enumerate(outputs):
+            mean = torch.squeeze(mean, -1).detach() / self.y_norm
+            variance = torch.squeeze(variance, -1).detach() / self.y_norm**2
+            means[i] = mean
+            mse = F.mse_loss(mean, self.eval_value(t))
+            mses[i] = mse
+
+            plt.plot(t, mean, color="red")
+
+            if plot_sigma:
+                higher_bound = mean + 3 * torch.sqrt(variance)
+                lower_bound = mean - 3 * torch.sqrt(variance)
+                plt.fill_between(t, lower_bound, higher_bound, color="lightgrey")
+
+        text = f"MSE of average: {F.mse_loss(means.mean(dim=0), self.eval_value(t))}\n" \
+            + f"Average MSE: {mses.mean(dim=0)}\n" \
+            + f"Minimal MSE: {mses.min(dim=0)[0]}"
+        plt.figtext(0.5, 0.01, text, ha="center", va="top", fontsize=12)
+
         plt.plot(t, self.eval_value(t), color="blue") # Actual function
 
-        means, variances = torch.zeros(len(t)), torch.zeros(len(t))
-        with torch.no_grad():
-            means, variances = eval_fn(torch.unsqueeze(t * self.x_norm, -1))
-        means = torch.squeeze(means, -1) / self.y_norm
-        variances = torch.squeeze(variances, -1) / self.y_norm**2
-
-        higher_bound = means + 3 * torch.sqrt(variances)
-        lower_bound = means - 3 * torch.sqrt(variances)
-        plt.plot(t, means, color="red") # Averaged predictions
-        plt.fill_between(t, lower_bound, higher_bound, color="lightgrey")
-        print(f"RMSE {torch.sqrt(F.mse_loss(means, self.eval_value(t)))}")
-
         xs, ys = zip(*(((x / self.x_norm).numpy(), (y / self.y_norm).numpy()) for (x, y) in self))
-        plt.scatter(xs, ys, s=4, color="blue")
+        plt.scatter(xs, ys, s=4, color="blue", zorder=10)
 
 def _sample_from_fn(function, min, max, sample_count, noise_sigma):
     xs = (max - min) * torch.rand(sample_count) + min
