@@ -40,7 +40,6 @@ class BBBLinear(nn.Module):
 
         self.in_features, self.out_features = in_features, out_features
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
-        self.log_prior, self.log_posterior = 0, 0
 
         # Weights
         self.weight_mu = nn.Parameter(torch.Tensor(self.out_features, self.in_features).uniform_(-0.1, 0.1))
@@ -72,7 +71,7 @@ class BBBLinear(nn.Module):
                 log_prior = self.weight_prior.log_prob(weight).sum() + self.bias_prior.log_prob(bias).sum()
                 log_posterior = log_prob(self.weight_mu, self.weight_rho, weight).sum() + log_prob(self.bias_mu, self.bias_rho, bias).sum()
                 self.kl += log_posterior - log_prior
-
+                
                 output += F.linear(input, weight, bias)
 
             self.kl /= self.mc_sample
@@ -89,6 +88,7 @@ class BBBLinear(nn.Module):
             for i in range(self.mc_sample):
                 epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
                 output += activation_mu + activation_std * epsilon
+                # How to calculate the log posterior?
             
             return output / self.mc_sample
         else:

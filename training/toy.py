@@ -3,6 +3,8 @@ import numpy as np
 import sklearn.datasets
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+import math
+from .util import gauss_logprob
 
 class RegressionToyDataset(torch.utils.data.Dataset):
     def __init__(self, min: float, max: float, sample_count: int, normalize: bool, noise: float):
@@ -41,18 +43,21 @@ class RegressionToyDataset(torch.utils.data.Dataset):
         min, max = self.min - extra, self.max + extra
         #plt.xlim(min, max)
         t = torch.linspace(min, max, 50)
+        y = self.eval_value(t)
 
         with torch.no_grad():
             outputs = eval_fn(torch.unsqueeze(t * self.x_norm, -1))
         
         means = torch.empty((len(outputs), t.shape[0]))
         mses = torch.empty((len(outputs)))
+        log_likelihoods = torch.empty((len(outputs), t.shape[0]))
         for i, (mean, variance) in enumerate(outputs):
             mean = torch.squeeze(mean, -1).detach() / self.y_norm
             variance = torch.squeeze(variance, -1).detach() / self.y_norm**2
             means[i] = mean
-            mse = F.mse_loss(mean, self.eval_value(t))
+            mse = F.mse_loss(mean, y)
             mses[i] = mse
+            log_likelihoods[i] = gauss_logprob(mean, variance, y)
 
             plt.plot(t, mean, color="red")
 
@@ -61,12 +66,16 @@ class RegressionToyDataset(torch.utils.data.Dataset):
                 lower_bound = mean - 3 * torch.sqrt(variance)
                 plt.fill_between(t, lower_bound, higher_bound, color="lightgrey")
 
-        text = f"MSE of average: {F.mse_loss(means.mean(dim=0), self.eval_value(t))}\n" \
+        marginal_log_likelihood = -math.log(len(outputs)) + torch.logsumexp(log_likelihoods, dim=0)
+
+        text = f"{len(outputs)} weight sample(s)\n" \
+            + f"Average marginal log likelihood: {marginal_log_likelihood.mean()}\n" \
+            + f"MSE of average: {F.mse_loss(means.mean(dim=0), y)}\n" \
             + f"Average MSE: {mses.mean(dim=0)}\n" \
             + f"Minimal MSE: {mses.min(dim=0)[0]}"
         plt.figtext(0.5, 0.01, text, ha="center", va="top", fontsize=12)
 
-        plt.plot(t, self.eval_value(t), color="blue") # Actual function
+        plt.plot(t, y, color="blue") # Actual function
 
         xs, ys = zip(*(((x / self.x_norm).numpy(), (y / self.y_norm).numpy()) for (x, y) in self))
         plt.scatter(xs, ys, s=4, color="blue", zorder=10)

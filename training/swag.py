@@ -33,5 +33,6 @@ class SWAGWrapper:
 
     def sample(self, model: nn.Module, input: torch.Tensor):
         dist = torch.distributions.MultivariateNormal(self.mean, self.covariance)
-        torch.nn.utils.convert_parameters.vector_to_parameters(dist.sample(), model.parameters())
+        weight_sample = dist.sample()
+        torch.nn.utils.convert_parameters.vector_to_parameters(weight_sample, model.parameters())
         return model(input)
