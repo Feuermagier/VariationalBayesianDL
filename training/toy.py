@@ -43,7 +43,7 @@ class RegressionToyDataset(torch.utils.data.Dataset):
     def generate_eval_range(self, extra_range):
         extra = (self.max - self.min) * extra_range
         min, max = self.min - extra, self.max + extra
-        return torch.linspace(min, max, 50)
+        return torch.linspace(min, max, 100)
 
     def generate_samples(self, eval_fn, samples, extra_range=0.01):
         t = self.generate_eval_range(extra_range)
@@ -83,12 +83,12 @@ class RegressionToyDataset(torch.utils.data.Dataset):
         #total_var = variances.sum(dim=0) / math.pow(samples), 2)
         total_var = means.var(dim=0, unbiased=False)
         total_mean = means.mean(dim=0)
-        marginal_log_likelihood = -math.log(samples) + torch.logsumexp(log_likelihoods, dim=0)
+        marginal_log_likelihood = -math.log(samples) + torch.logsumexp(log_likelihoods.sum(dim=1), dim=0)
 
         #gp_mean, gp_var = gp_eval(t)
         #wasserstein_dist = ((gp_mean - total_mean).abs() + gp_var + total_var - 2 * (gp_var * total_var).sqrt()).sqrt()
         wasserstein_dists = []
-        ref_means, _ = zip(*gp_eval(t, samples))
+        ref_means, _ = zip(*gp_eval(t, samples, y))
         ref_means = torch.stack(ref_means)
         for mean, ref_mean in zip(means.T, ref_means.T):
             wasserstein_dists.append(wasserstein_distance(mean, ref_mean))
@@ -96,7 +96,7 @@ class RegressionToyDataset(torch.utils.data.Dataset):
 
         text = f"{samples} weight sample(s)\n" \
             + f"Avg W(Model,GP): {wasserstein_dists.mean()}\n" \
-            + f"Avg BMA: {marginal_log_likelihood.mean()}\n" \
+            + f"MLL: {marginal_log_likelihood}\n" \
             + f"MSE of average: {F.mse_loss(total_mean, y)}\n" \
             + f"Average MSE: {mses.mean(dim=0)}\n" \
             + f"Minimal MSE: {mses.min(dim=0)[0]}"

@@ -44,12 +44,15 @@ def gaussian_process(epochs, xs, ys):
         if epoch % 20 == 0:
             print(f"Epoch {epoch}: loss {loss}")
 
-    def eval_gp(input, samples):
+    def eval_gp(input, samples, y=None):
         gp.eval()
         likelihood.eval()
         with torch.no_grad():
-            dist = likelihood(gp(input.squeeze(-1)))
-            return [(dist.sample(), torch.zeros(input.shape)) for _ in range(samples)]
+            dist = gp(input.squeeze(-1))
+            outputs = [(dist.sample(), likelihood.noise) for _ in range(samples)]
+            #if y is not None:
+            #    print(mll(dist, y) * len(input))
+            return outputs
 
     return eval_gp
 

@@ -5,7 +5,7 @@ import math
 
 def gauss_logprob(mean: torch.Tensor, variance: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     var = torch.max(torch.tensor(1e-6), variance)
-    return -((x - mean) ** 2) / (2 * var) - torch.log(var) - math.log(math.sqrt(2 * math.pi))
+    return -((x - mean) ** 2) / (2 * var) - torch.log(var.sqrt()) - math.log(math.sqrt(2 * math.pi))
 
 # Weighted sum of two gaussian distributions
 class GaussianMixture:
