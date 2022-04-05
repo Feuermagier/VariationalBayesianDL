@@ -9,7 +9,8 @@ import math
 import time
 from .util import GaussianMixture
 
-def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_fn, loader: torch.utils.data.DataLoader, device: torch.device) -> torch.Tensor:
+def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_fn, loader: torch.utils.data.DataLoader, device: torch.device, **kwargs) -> torch.Tensor:
+    samples = kwargs.get("samples", 1)
     model.train()
     epoch_loss = torch.tensor(0, dtype=torch.float)
     for i, (data, target) in enumerate(loader):
@@ -17,11 +18,16 @@ def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_f
         target = target.to(device)
 
         optimizer.zero_grad()
-        output = model(data)
+
+        loss = torch.tensor(0, dtype=torch.float)
         pi = 1 / len(loader)
         #pi = (2**(len(loader) - i - 1)) / (2**len(loader) - 1)
-        kl = sum([getattr(layer, "kl", 0) for layer in model])
-        loss = pi * kl + loss_fn(output, target)
+
+        for _ in range(samples):
+            output = model(data)
+            kl = sum([getattr(layer, "kl", 0) for layer in model])
+            loss += pi * kl + loss_fn(output, target)
+        loss /= samples
         loss.backward()
         #torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
         optimizer.step()
@@ -34,8 +40,8 @@ class BBBLinear(nn.Module):
         super().__init__()
         self.is_bayesian = True
         self.sampling = kwargs.get("sampling", "activations")
-        self.deterministic_eval = kwargs.get("deterministic_eval", False)
         self.mc_sample = kwargs.get("mc_sample", 1)
+        self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.device = device
         self.out_features, self.in_features = out_features, in_features
 
@@ -43,12 +49,12 @@ class BBBLinear(nn.Module):
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
 
         # Weights
-        self.weight_mu = nn.Parameter(torch.Tensor(self.out_features, self.in_features).normal_(0, 0.1))
-        self.weight_rho = nn.Parameter(torch.Tensor(self.out_features, self.in_features).uniform_(-3, -3))
+        self.weight_mu = nn.Parameter(torch.empty((self.out_features, self.in_features)).normal_(0, 0.1))
+        self.weight_rho = nn.Parameter(torch.empty((self.out_features, self.in_features)).uniform_(-3, -3))
 
         # Biases
-        self.bias_mu = nn.Parameter(torch.Tensor(out_features).normal_(0, 0.1))
-        self.bias_rho = nn.Parameter(torch.Tensor(self.out_features).uniform_(-3, -3))
+        self.bias_mu = nn.Parameter(torch.empty(out_features).normal_(0, 0.1))
+        self.bias_rho = nn.Parameter(torch.empty(self.out_features).uniform_(-3, -3))
 
         self.kl = 0
 
@@ -58,11 +64,8 @@ class BBBLinear(nn.Module):
 
     def forward(self, input: torch.Tensor):
         self.kl = 0
-        if not self.training and self.deterministic_eval:
-            weight = self.weight_mu
-            bias = self.bias_mu
-            return F.linear(input, weight, bias)
-        elif self.sampling == "parameters":
+
+        if self.sampling == "parameters":
             output = torch.zeros((input.shape[0], self.out_features))
 
             for i in range(self.mc_sample):
@@ -90,7 +93,10 @@ class BBBLinear(nn.Module):
 
             output = torch.zeros((input.shape[0], self.out_features))
             for i in range(self.mc_sample):
-                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
+                if self.training and self.freeze_on_eval:
+                    epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
+                else:
+                    epsilon = torch.empty(self.out_features).normal_(0, 1).to(self.device).unsqueeze(0).expand((activation_mu.shape))
                 output += activation_mu + activation_std * epsilon
                 # How to calculate the log posterior?
             
@@ -103,7 +109,7 @@ def to_sigma(rho):
 
 def log_prob(mu, rho, value):
     sigma = to_sigma(rho)
-    return -((value - mu)**2) / (2 * sigma**2) - sigma.log() - math.log(math.sqrt(2 * math.pi))
+    return torch.clamp(-((value - mu)**2) / (2 * sigma**2) - sigma.log() - math.log(math.sqrt(2 * math.pi)), -23, 0)
 
 # Closed form KL divergence for gaussians
 # See https://github.com/kumar-shridhar/PyTorch-BayesianCNN/blob/master/metrics.py
@@ -126,17 +132,17 @@ class GaussianPrior:
         return kl.sum()
 
 class MixturePrior:
-    def __init__(self, pi, sigma1, sigma2):
+    def __init__(self, pi, sigma1, sigma2, validate_args=None):
         self.pi = torch.tensor(pi)
         self.sigma1 = sigma1
         self.sigma2 = sigma2
-        self.dist1 = torch.distributions.Normal(0, sigma1)
-        self.dist2 = torch.distributions.Normal(0, sigma2)
+        self.dist1 = torch.distributions.Normal(0, sigma1, validate_args)
+        self.dist2 = torch.distributions.Normal(0, sigma2, validate_args)
 
     def log_prob(self, value):
-        prob1 = torch.log(self.pi) + self.dist1.log_prob(value)
-        prob2 = torch.log(1 - self.pi) + self.dist2.log_prob(value)
-        return torch.clamp(torch.logaddexp(prob1, prob2), -23, 0)
+        prob1 = torch.log(self.pi) + torch.clamp(self.dist1.log_prob(value), -23, 0)
+        prob2 = torch.log(1 - self.pi) + torch.clamp(self.dist2.log_prob(value), -23, 0)
+        return torch.logaddexp(prob1, prob2)
 
     def kl_divergence(self, mu2, sigma2):
         return -self.log_prob(mu2).sum()
