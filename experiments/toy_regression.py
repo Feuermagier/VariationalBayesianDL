@@ -44,17 +44,20 @@ def gaussian_process(epochs, xs, ys):
         if epoch % 20 == 0:
             print(f"Epoch {epoch}: loss {loss}")
 
-    def eval_gp(input, samples, y=None):
+    def eval_gp(input, samples):
         gp.eval()
         likelihood.eval()
         with torch.no_grad():
             dist = gp(input.squeeze(-1))
             outputs = [(dist.sample(), likelihood.noise) for _ in range(samples)]
-            #if y is not None:
-            #    print(mll(dist, y) * len(input))
             return outputs
 
-    return eval_gp
+    def gp_true_lml(input, y):
+        with torch.no_grad():
+            dist = gp(input.squeeze(-1))
+            return mll(dist, y) * len(input)
+
+    return eval_gp, gp_true_lml
 
 def point_estimator(layers, noise, learn_var, epochs, dataloader, batch_size, device):
     pp_model = util.GaussWrapper(util.generate_model(layers, "relu", None), noise, learn_var)
@@ -79,21 +82,22 @@ def point_estimator(layers, noise, learn_var, epochs, dataloader, batch_size, de
 
     return eval_pp
 
-def swag(layers, noise, learn_var, epochs, snapshot_freq, snapshots, dataloader, batch_size):
+def swag(layers, noise, learn_var, epochs, swag_config, dataloader, batch_size, device):
     swag_model = util.GaussWrapper(util.generate_model(layers, "relu", None), noise, learn_var)
-    optimizer = torch.optim.SGD(swag_model.parameters(), lr=0.01) # Without weight_decay the covariance matrix is not positive definit???
-    wrapper = SWAGWrapper(swag_model, snapshot_freq, snapshots)
+    optimizer = torch.optim.SGD(swag_model.parameters(), lr=0.01)
+    wrapper = SWAGWrapper(swag_model, swag_config, device)
 
     for epoch in range(epochs):
         epoch_loss = torch.tensor(0, dtype=torch.float)
-        for data, target in dataloader:
+        for i, (data, target) in enumerate(dataloader):
+            data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             mean, var = swag_model(data)
             loss = F.gaussian_nll_loss(mean, target, var)
             loss.backward()
             optimizer.step()
-            epoch_loss += loss
-        wrapper.update(epoch)
+            epoch_loss += loss.cpu()
+            wrapper.update(epoch, i)
         if epoch % 100 == 0:
             print(f"Epoch {epoch}: loss {epoch_loss / (len(dataloader) * batch_size)}")
     print(f"Final loss {epoch_loss / (len(dataloader) * batch_size)}")

@@ -4,8 +4,8 @@ import torch.nn.functional as F
 import math
 
 def gauss_logprob(mean: torch.Tensor, variance: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-    var = torch.max(torch.tensor(1e-6), variance)
-    return -((x - mean) ** 2) / (2 * var) - torch.log(var.sqrt()) - math.log(math.sqrt(2 * math.pi))
+    #var = torch.max(torch.tensor(1e-6), variance)
+    return -((x - mean) ** 2) / (2 * variance) - torch.log(variance.sqrt()) - math.log(math.sqrt(2 * math.pi))
 
 # Weighted sum of two gaussian distributions
 class GaussianMixture:
@@ -41,6 +41,8 @@ def map_activation(name):
         return nn.Sigmoid()
     elif name == "tanh":
         return nn.Tanh()
+    elif name == "logsoftmax":
+        return nn.LogSoftmax(dim=1)
     else:
         raise ValueError(f"Unknown activation function {name}")
 

@@ -45,77 +45,103 @@ class RegressionToyDataset(torch.utils.data.Dataset):
         min, max = self.min - extra, self.max + extra
         return torch.linspace(min, max, 100)
 
-    def generate_samples(self, eval_fn, samples, extra_range=0.01):
-        t = self.generate_eval_range(extra_range)
+    def generate_samples(self, eval_fn, samples, t):
         with torch.no_grad():
             outputs = eval_fn(torch.unsqueeze(t * self.x_norm, -1), samples)
-        assert len(outputs) == samples
         return outputs
 
-    def plot(self, name, eval_fn, gp_eval, extra_range=0.01, plot_sigma=False, alpha=1, samples=100):
-        plt.title(name)
+    def plot(self, name, eval_fn, gp_eval, extra_range=0.01, plot_sigma=False, alpha=1, samples=100, plot_lml_trend=None, gp_lml=None):
+        fig = plt.figure(figsize=(15, 6))
+        fig.suptitle(name, fontsize=16)
+
+        # Data points + predictions
+        data_ax = fig.add_subplot(1, 2, 1)
+
         t = self.generate_eval_range(extra_range)
         y = self.eval_value(t)
         #plt.ylim(-0.3, 0.9)
 
-        outputs = self.generate_samples(eval_fn, samples, extra_range)
+        outputs = self.generate_samples(eval_fn, samples, t)
         
+        # Plot samples and calculate MSEs
         means = torch.empty((samples, t.shape[0]))
-        variances = torch.empty((samples, t.shape[0]))
         mses = torch.empty(samples)
-        log_likelihoods = torch.empty((samples, t.shape[0]))
         for i, (mean, variance) in enumerate(outputs):
             mean = torch.squeeze(mean, -1).detach() / self.y_norm
             variance = torch.squeeze(variance, -1).detach() / self.y_norm**2
             means[i] = mean
-            variances[i] = variance
             mse = F.mse_loss(mean, y)
             mses[i] = mse
-            log_likelihoods[i] = gauss_logprob(mean, variance, y)
 
-            plt.plot(t, mean, color="red", alpha=alpha)
+            data_ax.plot(t, mean, color="red", alpha=alpha)
 
             if plot_sigma:
                 higher_bound = mean + 3 * torch.sqrt(variance)
                 lower_bound = mean - 3 * torch.sqrt(variance)
-                plt.fill_between(t, lower_bound, higher_bound, color="lightgrey")
+                data_ax.fill_between(t, lower_bound, higher_bound, color="lightgrey")
 
-        #total_var = variances.sum(dim=0) / math.pow(samples), 2)
-        total_var = means.var(dim=0, unbiased=False)
         total_mean = means.mean(dim=0)
-        marginal_log_likelihood = -math.log(samples) + torch.logsumexp(log_likelihoods.sum(dim=1), dim=0)
+        log_marginal_likelihood = calculate_lml_gaussian(y, outputs)
 
-        #gp_mean, gp_var = gp_eval(t)
-        #wasserstein_dist = ((gp_mean - total_mean).abs() + gp_var + total_var - 2 * (gp_var * total_var).sqrt()).sqrt()
         wasserstein_dists = []
-        ref_means, _ = zip(*gp_eval(t, samples, y))
+        ref_means, _ = zip(*gp_eval(t, samples))
         ref_means = torch.stack(ref_means)
         for mean, ref_mean in zip(means.T, ref_means.T):
             wasserstein_dists.append(wasserstein_distance(mean, ref_mean))
         wasserstein_dists = torch.tensor(wasserstein_dists)
 
-        text = f"{samples} weight sample(s)\n" \
-            + f"Avg W(Model,GP): {wasserstein_dists.mean()}\n" \
-            + f"MLL: {marginal_log_likelihood}\n" \
-            + f"MSE of average: {F.mse_loss(total_mean, y)}\n" \
-            + f"Average MSE: {mses.mean(dim=0)}\n" \
-            + f"Minimal MSE: {mses.min(dim=0)[0]}"
+        text = f"{samples} parameter sample(s)\n" \
+            + f"Avg W(Model,GP): {wasserstein_dists.mean():.5f}\n" \
+            + f"LML: {log_marginal_likelihood:.5f}\n" \
+            + f"MSE of average: {F.mse_loss(total_mean, y):.5f}\n" \
+            + f"Average MSE: {mses.mean(dim=0):.5f}\n" \
+            + f"Minimal MSE: {mses.min(dim=0)[0]:.5f}"
 
-        plt.figtext(0.5, 0.01, text, ha="center", va="top", fontsize=12)
+        data_ax.text(0.5, -0.1, text, ha="center", va="top", fontsize=14, transform=data_ax.transAxes)
 
-        plt.plot(t, y, color="blue") # Actual function
+        data_ax.plot(t, y, color="blue") # Actual function
 
         xs, ys = zip(*(((x / self.x_norm).numpy(), (y / self.y_norm).numpy()) for (x, y) in self))
-        plt.scatter(xs, ys, s=4, color="blue", zorder=10)
+        data_ax.scatter(xs, ys, s=4, color="blue", zorder=10)
 
-    def plot_dataset(self, extra_range=0.01):
+        if plot_lml_trend is not None:
+            (lml_max, lml_steps) = plot_lml_trend
+            lml_sample_counts = torch.linspace(1, lml_max, steps=lml_steps, dtype=torch.int)
+            lmls = []
+            for s in lml_sample_counts:
+                lml_samples = []
+                for _ in range(10):
+                    outputs = self.generate_samples(eval_fn, s, t)
+                    lml_samples.append(calculate_lml_gaussian(y, outputs))
+                lmls.append(sum(lml_samples) / len(lml_samples))
+            lml_ax = fig.add_subplot(1, 2, 2)
+            if gp_lml is not None:
+                true_lml = gp_lml(t, y)
+                lml_ax.axhline(y=true_lml, color="grey", linestyle="--")
+                lml_ax.text(0.5, 0.3, f"True LML: {true_lml:.2f}", 
+                    transform=lml_ax.transAxes, fontsize=14, verticalalignment="top", 
+                    bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
+            lml_ax.set_xlabel("Parameter Samples", fontsize=14)
+            lml_ax.set_ylabel("LML", fontsize=14)
+            lml_ax.plot(lml_sample_counts, lmls)
+
+
+
+    def plot_dataset(self, axis, extra_range=0.01):
         extra = (self.max - self.min) * extra_range
         min, max = self.min - extra, self.max + extra
         #plt.xlim(min, max)
         t = torch.linspace(min, max, 50)
         y = self.eval_value(t)
-        plt.plot(t, y, color="blue")
-        plt.scatter(self.xs, self.ys, s=4, color="blue")
+        axis.plot(t, y, color="blue")
+        axis.scatter(self.xs, self.ys, s=4, color="blue")
+
+def calculate_lml_gaussian(target, samples):
+    assert len(samples) > 0
+    log_likelihoods = torch.empty(len(samples))
+    for i, (mean, var) in enumerate(samples):
+        log_likelihoods[i] = gauss_logprob(mean, var, target).sum()
+    return -math.log(len(samples)) + torch.logsumexp(log_likelihoods, dim=0)
 
 def _sample_from_fn(function, min, max, sample_count, noise_sigma, skip=0):
     lower_xs = ((min + max - skip) / 2 - min) * torch.rand(math.floor(sample_count / 2)) + min

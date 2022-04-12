@@ -4,6 +4,8 @@ import torchvision
 from torchvision.transforms import transforms
 import matplotlib.pyplot as plt
 
+IMAGE_SIZE = 28
+
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(0.5, 0.5)
@@ -18,23 +20,24 @@ flattening_transform = transforms.Compose([
   transforms.Lambda(_flatten)
 ])
 
-def trainloader(batch_size: int = 5) -> torch.utils.data.DataLoader:
+def trainloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
     dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, transform=transform)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
-def testloader(batch_size: int = 5) -> torch.utils.data.DataLoader:
+def testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
     dataset = torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=transform)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
-def flattened_trainloader(batch_size: int = 5) -> torch.utils.data.DataLoader:
+def flattened_trainloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
     dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, transform=flattening_transform)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
-def flattened_testloader(batch_size: int = 5) -> torch.utils.data.DataLoader:
+def flattened_testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
     dataset = torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=flattening_transform)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
 def imshow(img):
+    img = img.reshape((IMAGE_SIZE, IMAGE_SIZE, 1))
     img = img / 2 + 0.5     # denormalize
     npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.imshow(npimg, cmap=plt.get_cmap('gray'))
