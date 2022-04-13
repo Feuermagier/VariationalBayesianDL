@@ -26,7 +26,7 @@ def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_f
         for _ in range(samples):
             output = model(data)
             kl = sum([getattr(layer, "kl", 0) for layer in model])
-            loss += pi * kl + loss_fn(output, target) * kl_rescaling
+            loss += (pi * kl + loss_fn(output, target) * kl_rescaling).cpu()
         loss /= samples
         loss.backward()
         #torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
@@ -89,13 +89,11 @@ class BBBLinear(nn.Module):
             bias_kl = self.bias_prior.kl_divergence(self.bias_mu, to_sigma(self.bias_rho))
             self.kl = weight_kl + bias_kl
 
-            output = torch.zeros((input.shape[0], self.out_features))
-            for i in range(self.mc_sample):
-                if self.training and self.freeze_on_eval:
-                    epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
-                else:
-                    epsilon = torch.empty(self.out_features).normal_(0, 1).to(self.device).unsqueeze(0).expand((activation_mu.shape))
-                output += activation_mu + activation_std * epsilon
+            if not self.training and self.freeze_on_eval:
+                epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(self.device)
+            else:
+                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
+            output = activation_mu + activation_std * epsilon
                 # How to calculate the log posterior?
             
             return output / self.mc_sample

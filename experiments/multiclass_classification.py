@@ -150,17 +150,19 @@ def mc_droupout(p, layers, epochs, dataloader, batch_size):
 
     return eval_dropout
 
-def bbb(prior, sampling, mc_samples, layers, epochs, dataloader, batch_size, device):
+def bbb(prior, sampling, mc_samples, kl_reweighting, layers, epochs, dataloader, batch_size, device):
     linear_fn = lambda i, o: BBBLinear(i, o, prior, prior, device, sampling=sampling)
     conv_fn = lambda i, o, k: BBBConvolution(i, o, k, prior, prior, device, sampling=sampling)
-    bbb_model = util.generate_model(layers, "relu", "sigmoid", linear_fn=linear_fn, conv_fn=conv_fn)
+    bbb_model = util.generate_model(layers, linear_fn=linear_fn, conv_fn=conv_fn)
     bbb_model.to(device)
     optimizer = torch.optim.SGD(bbb_model.parameters(), lr=0.01)
-    loss_fn = torch.nn.BCELoss()
+    loss_fn = torch.nn.NLLLoss()
 
+    losses = []
     for epoch in range(epochs):
-        loss = run_bbb_epoch(bbb_model, optimizer, loss_fn, dataloader, device, samples=mc_samples)
-        if epoch % 100 == 0:
+        loss = run_bbb_epoch(bbb_model, optimizer, loss_fn, dataloader, device, samples=mc_samples, kl_reweighting=kl_reweighting)
+        losses.append(loss)
+        if epoch % 1 == 0:
             print(f"Epoch {epoch}: loss {loss / (len(dataloader) * batch_size)}")
     print(f"Final loss {loss / (len(dataloader) * batch_size)}")
 
@@ -168,7 +170,7 @@ def bbb(prior, sampling, mc_samples, layers, epochs, dataloader, batch_size, dev
     def eval_bbb(input, samples):
         return [bbb_model(input) for _ in range(samples)]
     
-    return eval_bbb
+    return eval_bbb, losses
 
 def bbb_intel(config, layers, epochs, dataloader, batch_size):
     intel_model = util.generate_model(layers, "relu", "sigmoid")

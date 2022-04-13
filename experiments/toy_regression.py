@@ -205,14 +205,14 @@ def intel_bbb(layers, noise, learn_var, epochs, dataloader, batch_size):
 
     return eval_bayes
 
-def bbb(layers, noise, learn_var, epochs, dataloader, batch_size, device, sampling="activations", layer_samples=1, global_samples=5, kl_rescaling=1, prior=GaussianPrior(0, 1)):
+def bbb(layers, noise, learn_var, epochs, dataloader, batch_size, device, sampling="activations", global_samples=5, kl_rescaling=1, prior=GaussianPrior(0, 1)):
     pi = 0.25  # 0.25, 0.5, 0.75
     sigma1 = np.exp(-0)  # 0, 1, 2
     sigma2 = np.exp(-6)  # 6, 7, 8
     #prior = util.GaussianMixture(pi, sigma1, sigma2)
 
     bbb_model = util.GaussWrapper(
-        util.generate_model(layers, linear_fn=lambda i, o: BBBLinear(i, o, prior, prior, device, mc_sample=layer_samples, sampling=sampling)), 
+        util.generate_model(layers, linear_fn=lambda i, o: BBBLinear(i, o, prior, prior, device, sampling=sampling)), 
         noise, learn_var)
     bbb_model.to(device)
     optimizer = torch.optim.SGD(bbb_model.parameters(), lr=0.001, momentum=0.95)
