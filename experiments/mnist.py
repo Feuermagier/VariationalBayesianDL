@@ -22,22 +22,22 @@ flattening_transform = transforms.Compose([
 
 def trainloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
     dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, transform=transform)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 def testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
     dataset = torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=transform)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
-def flattened_trainloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
-    dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, transform=flattening_transform)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
+def fashion_trainloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
+    dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, download=True, transform=transform)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-def flattened_testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
-    dataset = torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=flattening_transform)
+def fashion_testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
+    dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, download=True, transform=transform)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
 def imshow(img):
-    img = img.reshape((IMAGE_SIZE, IMAGE_SIZE, 1))
+    #img = img.reshape((IMAGE_SIZE, IMAGE_SIZE, 1)) # unflatten
     img = img / 2 + 0.5     # denormalize
     npimg = img.numpy()
     plt.imshow(npimg, cmap=plt.get_cmap('gray'))

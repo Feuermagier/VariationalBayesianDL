@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 import torch
 import torch.nn as nn
+from torch.nn.utils.convert_parameters import parameters_to_vector, vector_to_parameters
 import torch.nn.functional as F
 import math
+import numpy as np
 
 @dataclass
 class SwagConfig:
@@ -18,7 +20,7 @@ class SWAGWrapper:
         self.start_epoch = config.get("start_epoch", 0)
         self.model = model
 
-        self.weights = torch.nn.utils.convert_parameters.parameters_to_vector(self.model.parameters())
+        self.weights = parameters_to_vector(self.model.parameters())
         self.sq_weights = self.weights**2
         self.updates = 0
         self.deviations = torch.zeros((self.weights.shape[0], self.deviation_samples)).to(device)
@@ -42,15 +44,21 @@ class SWAGWrapper:
             print(f"SWAG: starting to collect samples at epoch {epoch}, batch {batch_idx}")
         if epoch >= self.start_epoch and (epoch + 1) % self.update_every_epochs == 0 and (batch_idx + 1) % self.update_every_batches == 0:
             self.updates += 1
-            params = torch.nn.utils.convert_parameters.parameters_to_vector(self.model.parameters())
+            params = parameters_to_vector(self.model.parameters())
             self.weights = (self.updates * self.weights + params) / (self.updates + 1)
             self.sq_weights = (self.updates * self.sq_weights + params**2) / (self.updates + 1)
             self.deviations = torch.roll(self.deviations, -1, 1)
             self.deviations[:,-1] = params - self.weights
             self.param_dist_valid = False
 
-    def sample(self, model: nn.Module, input: torch.Tensor):
+    def sample(self, input: torch.Tensor):
+        old_params = parameters_to_vector(self.model.parameters())
         self.update_param_dist()
         weight_sample = self.param_dist.sample()
-        torch.nn.utils.convert_parameters.vector_to_parameters(weight_sample, model.parameters())
-        return model(input)
+        vector_to_parameters(weight_sample, self.model.parameters())
+        output = self.model(input)
+        vector_to_parameters(old_params, self.model.parameters())
+        return output
+
+    def report_status(self):
+        print(f"SWAG: Collected {np.minimum(self.updates, self.deviation_samples)} out of {self.deviation_samples} deviation samples and {self.updates} parameter samples")

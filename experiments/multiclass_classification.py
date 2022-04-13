@@ -12,21 +12,10 @@ from bayesian_torch.models.dnn_to_bnn import dnn_to_bnn, get_kl_loss
 
 from training import util
 from training.swag import SWAGWrapper
-from training.bbb import run_bbb_epoch, BBBLinear, GaussianPrior
+from training.bbb import BBBConvolution, run_bbb_epoch, BBBLinear, GaussianPrior
 from training.calibration import reliability_diagram
 
 def eval_model(name, eval_fn, losses, samples, testloader, device):
-    fig = plt.figure(figsize=(15, 5))
-    fig.suptitle(name, fontsize=16)
-    epochs = len(losses)
-
-    # Plot loss over time
-    loss_ax = fig.add_subplot(1, 2, 1)
-    loss_ax.set_xlabel("Epochs", fontsize=14)
-    loss_ax.set_xticks(np.arange(1, epochs + 1, 1))
-    loss_ax.set_ylabel("Training Loss", fontsize=14)
-    loss_ax.plot(np.arange(1, epochs + 1, 1), losses)
-
     # Test performance
     errors = torch.empty(0)
     confidences = torch.empty(0)
@@ -38,13 +27,24 @@ def eval_model(name, eval_fn, losses, samples, testloader, device):
             errors = torch.cat((errors, preds == target))
             confs = outputs[:,torch.arange(outputs.shape[1]),preds].mean(dim=0).exp()
             confidences = torch.cat((confidences, confs))
-    print(f"Test Accuracy: {errors.sum() / len(errors)}")
+    accuracy = errors.sum() / len(errors)
+
+    fig = plt.figure(figsize=(15, 5))
+    fig.suptitle(name + f" (Test Accuracy {accuracy:.3f})", fontsize=16)
+    epochs = len(losses)
+
+    # Plot loss over time
+    loss_ax = fig.add_subplot(1, 2, 1)
+    loss_ax.set_xlabel("Epochs", fontsize=14)
+    loss_ax.set_xticks(np.arange(1, epochs + 1, 1))
+    loss_ax.set_ylabel("Training Loss", fontsize=14)
+    loss_ax.plot(np.arange(1, epochs + 1, 1), losses)
 
     rel_ax = fig.add_subplot(1, 2, 2)
     reliability_diagram(10, errors, confidences, rel_ax)
 
 def point_predictor(layers, epochs, dataloader, batch_size, device):
-    pp_model = util.generate_model(layers, "relu", "logsoftmax")
+    pp_model = util.generate_model(layers)
     pp_model.to(device)
 
     optimizer = torch.optim.SGD(pp_model.parameters(), lr=0.01)
@@ -62,7 +62,7 @@ def point_predictor(layers, epochs, dataloader, batch_size, device):
         epoch_loss /= (len(dataloader) * batch_size)
         losses.append(epoch_loss)
         if epoch % 1 == 0:
-            print(f"Epoch {epoch}: loss {epoch_loss}")
+            print(f"Epoch {epoch}: NLL loss {epoch_loss}")
     print(f"Final loss {epoch_loss}")
 
     def eval_pp(input, samples):
@@ -71,7 +71,7 @@ def point_predictor(layers, epochs, dataloader, batch_size, device):
     return eval_pp, losses
 
 def swag(layers, epochs, dataloader, batch_size, swag_config, device):
-    swag_model = util.generate_model(layers, "relu", "logsoftmax")
+    swag_model = util.generate_model(layers)
     swag_model.to(device)
     optimizer = torch.optim.SGD(swag_model.parameters(), lr=0.01)
     wrapper = SWAGWrapper(swag_model, swag_config, device)
@@ -90,12 +90,13 @@ def swag(layers, epochs, dataloader, batch_size, swag_config, device):
         epoch_loss /= (len(dataloader) * batch_size)
         losses.append(epoch_loss)
         if epoch % 1 == 0:
-            print(f"Epoch {epoch}: loss {epoch_loss}")
+            print(f"Epoch {epoch}: NLL loss {epoch_loss}")
     print(f"Final loss {epoch_loss}")
+    wrapper.report_status()
 
     def eval_swag(input, samples):
         torch.manual_seed(42)
-        return [wrapper.sample(swag_model, input) for _ in range(samples)]
+        return [wrapper.sample(input) for _ in range(samples)]
     
     return eval_swag, losses
 
@@ -116,7 +117,7 @@ def ensemble(ensemble_count, layers, epochs, dataloader, batch_size):
                 epoch_loss += loss
             if epoch % 100 == 0:
                 print(f"  Epoch {epoch}: loss {epoch_loss / (len(dataloader) * batch_size)}")
-        print(f"  Final loss {epoch_loss / (len(dataloader) * batch_size)}")
+        print(f"Final loss {epoch_loss / (len(dataloader) * batch_size)}")
 
 
     def eval_esemble(input, samples):
@@ -149,14 +150,16 @@ def mc_droupout(p, layers, epochs, dataloader, batch_size):
 
     return eval_dropout
 
-def bbb(prior, mc_sample, sampling, layers, epochs, dataloader, batch_size, device):
-    bbb_model = util.generate_model(layers, "relu", "sigmoid", linear_fn=lambda i, o: BBBLinear(i, o, prior, prior, device, mc_sample=mc_sample, sampling=sampling))
+def bbb(prior, sampling, mc_samples, layers, epochs, dataloader, batch_size, device):
+    linear_fn = lambda i, o: BBBLinear(i, o, prior, prior, device, sampling=sampling)
+    conv_fn = lambda i, o, k: BBBConvolution(i, o, k, prior, prior, device, sampling=sampling)
+    bbb_model = util.generate_model(layers, "relu", "sigmoid", linear_fn=linear_fn, conv_fn=conv_fn)
     bbb_model.to(device)
     optimizer = torch.optim.SGD(bbb_model.parameters(), lr=0.01)
     loss_fn = torch.nn.BCELoss()
 
     for epoch in range(epochs):
-        loss = run_bbb_epoch(bbb_model, optimizer, loss_fn, dataloader, device)
+        loss = run_bbb_epoch(bbb_model, optimizer, loss_fn, dataloader, device, samples=mc_samples)
         if epoch % 100 == 0:
             print(f"Epoch {epoch}: loss {loss / (len(dataloader) * batch_size)}")
     print(f"Final loss {loss / (len(dataloader) * batch_size)}")

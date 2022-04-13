@@ -21,6 +21,9 @@ def reliability_diagram(bin_count, errors, confidences, ax=None):
     ax.set_ylabel('Accuracy', fontsize=14)
     ax.set_xlabel('Confidence', fontsize=14)
 
+    for (x, count) in zip(interval, bins):
+        ax.text(x + 0.5 * 1 / bin_count, 0.01, str(len(count)), color="white", fontsize=14, ha="center")
+
     ece = np.mean(np.abs(bin_accuracys - bin_confidences))
     mce = np.max(np.abs(bin_accuracys - bin_confidences))
 

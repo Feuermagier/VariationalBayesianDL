@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from socket import NI_MAXSERV
 import numpy as np
 import torch
 import torch.nn as nn
@@ -11,6 +10,7 @@ from .util import GaussianMixture
 
 def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_fn, loader: torch.utils.data.DataLoader, device: torch.device, **kwargs) -> torch.Tensor:
     samples = kwargs.get("samples", 1)
+    kl_rescaling = kwargs.get("kl_rescaling", 1)
     model.train()
     epoch_loss = torch.tensor(0, dtype=torch.float)
     for i, (data, target) in enumerate(loader):
@@ -26,7 +26,7 @@ def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_f
         for _ in range(samples):
             output = model(data)
             kl = sum([getattr(layer, "kl", 0) for layer in model])
-            loss += pi * kl + loss_fn(output, target)
+            loss += pi * kl + loss_fn(output, target) * kl_rescaling
         loss /= samples
         loss.backward()
         #torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
@@ -43,8 +43,6 @@ class BBBLinear(nn.Module):
         self.mc_sample = kwargs.get("mc_sample", 1)
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.device = device
-        self.out_features, self.in_features = out_features, in_features
-
         self.in_features, self.out_features = in_features, out_features
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
 
@@ -104,12 +102,66 @@ class BBBLinear(nn.Module):
         else:
             raise ValueError("Invalid value of sampling")
 
+class BBBConvolution(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, weight_prior, bias_prior, device: torch.device, **kwargs):
+        super().__init__()
+        self.is_bayesian = True
+        self.sampling = kwargs.get("sampling", "activations")
+        self.stride = kwargs.get("stride", 1)
+        self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
+        self.device = device
+        self.out_channels, self.in_channels = out_channels, in_channels
+        self.kernel_size = kernel_size
+
+        self.weight_prior, self.bias_prior = weight_prior, bias_prior
+
+        # Weights
+        self.weight_mu = nn.Parameter(torch.empty((self.out_channels, self.in_channels, self.kernel_size, self.kernel_size)).normal_(0, 0.1))
+        self.weight_rho = nn.Parameter(torch.empty((self.out_channels, self.in_channels, self.kernel_size, self.kernel_size)).uniform_(-3, -3))
+
+        # Biases
+        self.bias_mu = nn.Parameter(torch.empty(self.out_channels).normal_(0, 0.1))
+        self.bias_rho = nn.Parameter(torch.empty(self.out_channels).uniform_(-3, -3))
+
+        self.kl = 0
+
+    def sample_parameters(self, mu, rho):
+        epsilon = torch.empty(rho.shape).normal_(0, 1).to(self.device)
+        return mu + to_sigma(rho) * epsilon
+
+    def forward(self, input: torch.Tensor):
+        self.kl = 0
+
+        if self.sampling == "parameters":
+            raise NotImplementedError()
+        elif self.sampling == "activations":
+            activation_mu = F.conv2d(input, self.weight_mu, self.bias_mu, self.stride)
+            activation_var = F.conv2d(input**2, to_sigma(self.weight_rho)**2, to_sigma(self.bias_rho)**2, self.stride)
+            activation_std = torch.sqrt(activation_var)
+            
+            #log_prior = self.weight_prior.log_prob(self.weight_mu).sum() + self.bias_prior.log_prob(self.bias_mu).sum() 
+            #self.kl = -log_prior
+            weight_kl = self.weight_prior.kl_divergence(self.weight_mu, to_sigma(self.weight_rho))
+            bias_kl = self.bias_prior.kl_divergence(self.bias_mu, to_sigma(self.bias_rho))
+            self.kl = weight_kl + bias_kl
+
+            if not self.training and self.freeze_on_eval:
+                epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(self.device)
+            else:
+                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
+            output = activation_mu + activation_std * epsilon
+            
+            return output
+        else:
+            raise ValueError("Invalid value of sampling")
+
 def to_sigma(rho):
     return F.softplus(rho)
 
 def log_prob(mu, rho, value):
-    sigma = to_sigma(rho)
-    return torch.clamp(-((value - mu)**2) / (2 * sigma**2) - sigma.log() - math.log(math.sqrt(2 * math.pi)), -23, 0)
+    #sigma = to_sigma(rho)
+    #return torch.clamp(-((value - mu)**2) / (2 * sigma**2) - sigma.log() - math.log(math.sqrt(2 * math.pi)), -23, 0)
+    return torch.clamp(torch.distributions.Normal(mu, to_sigma(rho), False).log_prob(value), -23, 0)
 
 # Closed form KL divergence for gaussians
 # See https://github.com/kumar-shridhar/PyTorch-BayesianCNN/blob/master/metrics.py

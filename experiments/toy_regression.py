@@ -172,7 +172,7 @@ def mc_dropout(p, layers, noise, learn_var, epochs, dataloader, batch_size):
     return eval_dropout
 
 def intel_bbb(layers, noise, learn_var, epochs, dataloader, batch_size):
-    intel_model = util.GaussWrapper(util.generate_model(layers, "relu", None), noise, learn_var)
+    intel_model = util.GaussWrapper(util.generate_model(layers), noise, learn_var)
     dnn_to_bnn(intel_model, {
             "prior_mu": 0.0,
             "prior_sigma": 1.0,
@@ -205,14 +205,14 @@ def intel_bbb(layers, noise, learn_var, epochs, dataloader, batch_size):
 
     return eval_bayes
 
-def bbb(layers, noise, learn_var, epochs, dataloader, batch_size, device, sampling="activations", layer_samples=1, global_samples=5, prior=GaussianPrior(0, 1)):
+def bbb(layers, noise, learn_var, epochs, dataloader, batch_size, device, sampling="activations", layer_samples=1, global_samples=5, kl_rescaling=1, prior=GaussianPrior(0, 1)):
     pi = 0.25  # 0.25, 0.5, 0.75
     sigma1 = np.exp(-0)  # 0, 1, 2
     sigma2 = np.exp(-6)  # 6, 7, 8
     #prior = util.GaussianMixture(pi, sigma1, sigma2)
 
-    bbb_model = util.GaussWrapper(util.generate_model(layers, "relu", None, 
-        linear_fn=lambda i, o: BBBLinear(i, o, prior, prior, device, mc_sample=layer_samples, sampling=sampling)), 
+    bbb_model = util.GaussWrapper(
+        util.generate_model(layers, linear_fn=lambda i, o: BBBLinear(i, o, prior, prior, device, mc_sample=layer_samples, sampling=sampling)), 
         noise, learn_var)
     bbb_model.to(device)
     optimizer = torch.optim.SGD(bbb_model.parameters(), lr=0.001, momentum=0.95)
@@ -221,7 +221,7 @@ def bbb(layers, noise, learn_var, epochs, dataloader, batch_size, device, sampli
         return F.gaussian_nll_loss(mean, target, var)
 
     for epoch in range(epochs):
-        loss = run_bbb_epoch(bbb_model, optimizer, uncurried_nll_loss, dataloader, device, samples=global_samples)
+        loss = run_bbb_epoch(bbb_model, optimizer, uncurried_nll_loss, dataloader, device, samples=global_samples, kl_rescaling=kl_rescaling)
         if epoch % 10 == 0:
             print(f"Epoch {epoch}: loss {loss / (len(dataloader) * batch_size)}")
     print(f"Final loss {loss / (len(dataloader) * batch_size)}")
