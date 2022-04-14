@@ -1,3 +1,4 @@
+from multiprocessing import reduction
 import numpy as np
 import torch
 import torch.nn as nn
@@ -141,7 +142,7 @@ class BayesianNetwork(nn.Module):
             if self.CLASSES > 1:
                 sample_log_likelihood = -F.nll_loss(output, target, reduction='sum')
             else:
-                sample_log_likelihood = -F.gaussian_nll_loss(output, target, variance)
+                sample_log_likelihood = -F.mse_loss(output, target, reduction="sum")
             s_log_pw += sample_log_pw
             s_log_qw += sample_log_qw
             s_log_likelihood += sample_log_likelihood
@@ -150,6 +151,6 @@ class BayesianNetwork(nn.Module):
 
         # KL weighting
         if batch_idx is None: # standard literature approach - Graves (2011)
-            return (1. / (self.NUM_BATCHES)) * (l_qw - l_pw) - 3 * l_likelihood
+            return (1. / (self.NUM_BATCHES)) * (l_qw - l_pw) - l_likelihood
         else: # alternative - Blundell (2015)
             return 2. ** ( self.NUM_BATCHES - batch_idx - 1. ) / ( 2. ** self.NUM_BATCHES - 1 ) * (l_qw - l_pw) - l_likelihood

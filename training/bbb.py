@@ -20,16 +20,16 @@ def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_f
         optimizer.zero_grad()
 
         loss = torch.tensor(0, dtype=torch.float)
-        pi = 1 / len(loader)
+        pi = kl_rescaling / len(loader)
         #pi = (2**(len(loader) - i - 1)) / (2**len(loader) - 1)
 
         for _ in range(samples):
             output = model(data)
             kl = sum([getattr(layer, "kl", 0) for layer in model])
-            loss += (pi * kl + loss_fn(output, target) * kl_rescaling).cpu()
+            loss += (pi * kl + loss_fn(output, target)).cpu()
         loss /= samples
         loss.backward()
-        #torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
+        nn.utils.clip_grad.clip_grad_norm_(model.parameters(), 10)
         optimizer.step()
         epoch_loss += loss.cpu()
     return epoch_loss

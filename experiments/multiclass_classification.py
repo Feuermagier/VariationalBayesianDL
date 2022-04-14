@@ -60,7 +60,7 @@ def point_predictor(layers, epochs, dataloader, batch_size, device):
             optimizer.step()
             epoch_loss += loss.cpu()
         epoch_loss /= (len(dataloader) * batch_size)
-        losses.append(epoch_loss)
+        losses.append(epoch_loss.detach())
         if epoch % 1 == 0:
             print(f"Epoch {epoch}: NLL loss {epoch_loss}")
     print(f"Final loss {epoch_loss}")
@@ -88,7 +88,7 @@ def swag(layers, epochs, dataloader, batch_size, swag_config, device):
             epoch_loss += loss.cpu()
             wrapper.update(epoch, i)
         epoch_loss /= (len(dataloader) * batch_size)
-        losses.append(epoch_loss)
+        losses.append(epoch_loss.detach())
         if epoch % 1 == 0:
             print(f"Epoch {epoch}: NLL loss {epoch_loss}")
     print(f"Final loss {epoch_loss}")
@@ -150,18 +150,18 @@ def mc_droupout(p, layers, epochs, dataloader, batch_size):
 
     return eval_dropout
 
-def bbb(prior, sampling, mc_samples, kl_reweighting, layers, epochs, dataloader, batch_size, device):
+def bbb(prior, sampling, mc_samples, kl_rescaling, layers, epochs, dataloader, batch_size, device):
     linear_fn = lambda i, o: BBBLinear(i, o, prior, prior, device, sampling=sampling)
     conv_fn = lambda i, o, k: BBBConvolution(i, o, k, prior, prior, device, sampling=sampling)
     bbb_model = util.generate_model(layers, linear_fn=linear_fn, conv_fn=conv_fn)
     bbb_model.to(device)
-    optimizer = torch.optim.SGD(bbb_model.parameters(), lr=0.01)
-    loss_fn = torch.nn.NLLLoss()
+    optimizer = torch.optim.SGD(bbb_model.parameters(), lr=0.001)
+    loss_fn = torch.nn.NLLLoss(reduction="sum")
 
     losses = []
     for epoch in range(epochs):
-        loss = run_bbb_epoch(bbb_model, optimizer, loss_fn, dataloader, device, samples=mc_samples, kl_reweighting=kl_reweighting)
-        losses.append(loss)
+        loss = run_bbb_epoch(bbb_model, optimizer, loss_fn, dataloader, device, samples=mc_samples, kl_rescaling=kl_rescaling)
+        losses.append(loss.detach())
         if epoch % 1 == 0:
             print(f"Epoch {epoch}: loss {loss / (len(dataloader) * batch_size)}")
     print(f"Final loss {loss / (len(dataloader) * batch_size)}")

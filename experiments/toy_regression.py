@@ -1,5 +1,6 @@
 import multiprocessing
 from itertools import repeat
+from multiprocessing import reduction
 import numpy as np
 import torch
 import torch.nn as nn
@@ -218,10 +219,12 @@ def bbb(layers, noise, learn_var, epochs, dataloader, batch_size, device, sampli
     optimizer = torch.optim.SGD(bbb_model.parameters(), lr=0.001, momentum=0.95)
     def uncurried_nll_loss(output, target):
         mean, var = output
-        return F.gaussian_nll_loss(mean, target, var)
+        return F.gaussian_nll_loss(mean, target, var, reduction="sum")
 
+    losses = []
     for epoch in range(epochs):
         loss = run_bbb_epoch(bbb_model, optimizer, uncurried_nll_loss, dataloader, device, samples=global_samples, kl_rescaling=kl_rescaling)
+        losses.append(loss)
         if epoch % 10 == 0:
             print(f"Epoch {epoch}: loss {loss / (len(dataloader) * batch_size)}")
     print(f"Final loss {loss / (len(dataloader) * batch_size)}")
@@ -231,4 +234,4 @@ def bbb(layers, noise, learn_var, epochs, dataloader, batch_size, device, sampli
         bbb_model.eval()
         return [bbb_model(input) for _ in range(samples)]
 
-    return eval_bbb
+    return eval_bbb, losses
