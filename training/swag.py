@@ -13,12 +13,15 @@ class SwagConfig:
     max_cov_samples: int
 
 class SWAGWrapper:
-    def __init__(self, model: nn.Module, config, device):
+    def __init__(self, model: nn.Module, optimizer, config, device, use_lr_cycles: bool = True):
         self.update_every_batches = config.get("update_every_batches", 1)
-        self.update_every_epochs = config.get("update_every_epochs", 1)
         self.deviation_samples = config.get("deviation_samples", 10)
         self.start_epoch = config.get("start_epoch", 0)
+        self.max_lr = config.get("max_lr", 0.005)
+        self.min_lr = config.get("min_lr", 0.001)
         self.model = model
+        self.optimizer = optimizer
+        self.use_lr_cycles = use_lr_cycles
 
         self.weights = parameters_to_vector(self.model.parameters())
         self.sq_weights = self.weights**2
@@ -26,6 +29,7 @@ class SWAGWrapper:
         self.deviations = torch.zeros((self.weights.shape[0], self.deviation_samples)).to(device)
         self.param_dist_valid = False
         self.param_dist = None
+        self.batches_since_swag_start = 0
 
     @property
     def mean(self):
@@ -40,16 +44,25 @@ class SWAGWrapper:
             self.param_dist_valid = True
 
     def update(self, epoch, batch_idx):
-        if epoch == self.start_epoch and (batch_idx + 1) == self.update_every_batches:
-            print(f"SWAG: starting to collect samples at epoch {epoch}, batch {batch_idx}")
-        if epoch >= self.start_epoch and (epoch + 1) % self.update_every_epochs == 0 and (batch_idx + 1) % self.update_every_batches == 0:
-            self.updates += 1
-            params = parameters_to_vector(self.model.parameters())
-            self.weights = (self.updates * self.weights + params) / (self.updates + 1)
-            self.sq_weights = (self.updates * self.sq_weights + params**2) / (self.updates + 1)
-            self.deviations = torch.roll(self.deviations, -1, 1)
-            self.deviations[:,-1] = params - self.weights
-            self.param_dist_valid = False
+        if epoch >= self.start_epoch:
+            self.batches_since_swag_start += 1
+
+            if self.batches_since_swag_start % self.update_every_batches == 0:
+                self.updates += 1
+                params = parameters_to_vector(self.model.parameters())
+                self.weights = (self.updates * self.weights + params) / (self.updates + 1)
+                self.sq_weights = (self.updates * self.sq_weights + params**2) / (self.updates + 1)
+                self.deviations = torch.roll(self.deviations, -1, 1)
+                self.deviations[:,-1] = params - self.weights
+                self.param_dist_valid = False
+                if self.use_lr_cycles:
+                    print(f"SWAG: Collected a sample at epoch {epoch}, batch {batch_idx} with last lr {self.lr}")
+
+            if self.use_lr_cycles:
+                t = 1 - (self.batches_since_swag_start % self.update_every_batches) / self.update_every_batches
+                self.lr = t * (self.max_lr - self.min_lr) + self.min_lr
+                for g in self.optimizer.param_groups:
+                    g["lr"] = self.lr
 
     def sample(self, input: torch.Tensor):
         old_params = parameters_to_vector(self.model.parameters())

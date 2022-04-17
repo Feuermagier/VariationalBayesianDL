@@ -74,7 +74,7 @@ def swag(layers, epochs, dataloader, batch_size, swag_config, device):
     swag_model = util.generate_model(layers)
     swag_model.to(device)
     optimizer = torch.optim.SGD(swag_model.parameters(), lr=0.01)
-    wrapper = SWAGWrapper(swag_model, swag_config, device)
+    wrapper = SWAGWrapper(swag_model, optimizer, swag_config, device)
     losses = []
     for epoch in range(epochs):
         epoch_loss = torch.tensor(0, dtype=torch.float)
@@ -161,10 +161,11 @@ def bbb(prior, sampling, mc_samples, kl_rescaling, layers, epochs, dataloader, b
     losses = []
     for epoch in range(epochs):
         loss = run_bbb_epoch(bbb_model, optimizer, loss_fn, dataloader, device, samples=mc_samples, kl_rescaling=kl_rescaling)
+        loss /= len(dataloader) * batch_size
         losses.append(loss.detach())
         if epoch % 1 == 0:
-            print(f"Epoch {epoch}: loss {loss / (len(dataloader) * batch_size)}")
-    print(f"Final loss {loss / (len(dataloader) * batch_size)}")
+            print(f"Epoch {epoch}: loss {loss}")
+    print(f"Final loss {loss}")
 
 
     def eval_bbb(input, samples):
