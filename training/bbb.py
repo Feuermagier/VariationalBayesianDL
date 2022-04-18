@@ -42,6 +42,7 @@ class BBBLinear(nn.Module):
         self.sampling = kwargs.get("sampling", "activations")
         self.mc_sample = kwargs.get("mc_sample", 1)
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
+        self.kl_on_eval = kwargs.get("kl_on_eval", False)
         self.device = device
         self.in_features, self.out_features = in_features, out_features
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
@@ -56,45 +57,48 @@ class BBBLinear(nn.Module):
 
         self.kl = 0
 
-    def sample_parameters(self, mu, rho):
-        epsilon = torch.empty(rho.shape).normal_(0, 1).to(self.device)
-        return mu + to_sigma(rho) * epsilon
+    def sample_parameters(self, mu, sigma):
+        epsilon = torch.empty(sigma.shape).normal_(0, 1).to(self.device)
+        return mu + sigma * epsilon
 
     def forward(self, input: torch.Tensor):
         self.kl = 0
+
+        weight_sigma = to_sigma(self.weight_rho)
+        bias_sigma = to_sigma(self.bias_rho)
 
         if self.sampling == "parameters":
             output = torch.zeros((input.shape[0], self.out_features))
 
             for i in range(self.mc_sample):
-                weight = self.sample_parameters(self.weight_mu, self.weight_rho)
-                bias = self.sample_parameters(self.bias_mu, self.bias_rho)
-
-                log_prior = self.weight_prior.log_prob(weight).sum() + self.bias_prior.log_prob(bias).sum()
-                log_posterior = log_prob(self.weight_mu, self.weight_rho, weight).sum() + log_prob(self.bias_mu, self.bias_rho, bias).sum()
-                self.kl += log_posterior - log_prior
-                
+                weight = self.sample_parameters(self.weight_mu, weight_sigma)
+                bias = self.sample_parameters(self.bias_mu, bias_sigma)
                 output += F.linear(input, weight, bias)
+
+                if self.training or self.kl_on_eval:
+                    log_prior = self.weight_prior.log_prob(weight).sum() + self.bias_prior.log_prob(bias).sum()
+                    log_posterior = log_prob(self.weight_mu, weight_sigma, weight).sum() + log_prob(self.bias_mu, bias_sigma, bias).sum()
+                    self.kl += log_posterior - log_prior
 
             self.kl /= self.mc_sample
             return output / self.mc_sample
         elif self.sampling == "activations":
             activation_mu = F.linear(input, self.weight_mu, self.bias_mu)
-            activation_var = F.linear(input**2, to_sigma(self.weight_rho)**2, to_sigma(self.bias_rho)**2)
+            activation_var = F.linear(input**2, weight_sigma**2, bias_sigma**2)
             activation_std = torch.sqrt(activation_var)
-            
-            #log_prior = self.weight_prior.log_prob(self.weight_mu).sum() + self.bias_prior.log_prob(self.bias_mu).sum() 
-            #self.kl = -log_prior
-            weight_kl = self.weight_prior.kl_divergence(self.weight_mu, to_sigma(self.weight_rho))
-            bias_kl = self.bias_prior.kl_divergence(self.bias_mu, to_sigma(self.bias_rho))
-            self.kl = weight_kl + bias_kl
 
             if not self.training and self.freeze_on_eval:
                 epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(self.device)
             else:
                 epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
             output = activation_mu + activation_std * epsilon
-                # How to calculate the log posterior?
+            
+            if self.training or self.kl_on_eval:
+                #log_prior = self.weight_prior.log_prob(self.weight_mu).sum() + self.bias_prior.log_prob(self.bias_mu).sum() 
+                #self.kl = -log_prior
+                weight_kl = self.weight_prior.kl_divergence(self.weight_mu, weight_sigma)
+                bias_kl = self.bias_prior.kl_divergence(self.bias_mu, bias_sigma)
+                self.kl = weight_kl + bias_kl
             
             return output / self.mc_sample
         else:
@@ -107,6 +111,7 @@ class BBBConvolution(nn.Module):
         self.sampling = kwargs.get("sampling", "activations")
         self.stride = kwargs.get("stride", 1)
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
+        self.kl_on_eval = kwargs.get("kl_on_eval", False)
         self.device = device
         self.out_channels, self.in_channels = out_channels, in_channels
         self.kernel_size = kernel_size
@@ -123,32 +128,31 @@ class BBBConvolution(nn.Module):
 
         self.kl = 0
 
-    def sample_parameters(self, mu, rho):
-        epsilon = torch.empty(rho.shape).normal_(0, 1).to(self.device)
-        return mu + to_sigma(rho) * epsilon
-
     def forward(self, input: torch.Tensor):
         self.kl = 0
+
+        weight_sigma = to_sigma(self.weight_rho)
+        bias_sigma = to_sigma(self.bias_rho)
 
         if self.sampling == "parameters":
             raise NotImplementedError()
         elif self.sampling == "activations":
+
             activation_mu = F.conv2d(input, self.weight_mu, self.bias_mu, self.stride)
-            activation_var = F.conv2d(input**2, to_sigma(self.weight_rho)**2, to_sigma(self.bias_rho)**2, self.stride)
+            activation_var = F.conv2d(input**2, weight_sigma**2, bias_sigma**2, self.stride)
             activation_std = torch.sqrt(activation_var)
-            
-            #log_prior = self.weight_prior.log_prob(self.weight_mu).sum() + self.bias_prior.log_prob(self.bias_mu).sum() 
-            #self.kl = -log_prior
-            weight_kl = self.weight_prior.kl_divergence(self.weight_mu, to_sigma(self.weight_rho))
-            bias_kl = self.bias_prior.kl_divergence(self.bias_mu, to_sigma(self.bias_rho))
-            self.kl = weight_kl + bias_kl
 
             if not self.training and self.freeze_on_eval:
                 epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(self.device)
             else:
                 epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
             output = activation_mu + activation_std * epsilon
-            
+
+            if self.training or self.kl_on_eval:
+                weight_kl = self.weight_prior.kl_divergence(self.weight_mu, weight_sigma)
+                bias_kl = self.bias_prior.kl_divergence(self.bias_mu, bias_sigma)
+                self.kl = weight_kl + bias_kl
+
             return output
         else:
             raise ValueError("Invalid value of sampling")
@@ -156,10 +160,9 @@ class BBBConvolution(nn.Module):
 def to_sigma(rho):
     return F.softplus(rho)
 
-def log_prob(mu, rho, value):
-    #sigma = to_sigma(rho)
+def log_prob(mu, sigma, value):
     #return torch.clamp(-((value - mu)**2) / (2 * sigma**2) - sigma.log() - math.log(math.sqrt(2 * math.pi)), -23, 0)
-    return torch.clamp(torch.distributions.Normal(mu, to_sigma(rho), False).log_prob(value), -23, 0)
+    return torch.clamp(torch.distributions.Normal(mu, sigma, False).log_prob(value), -23, 0)
 
 # Closed form KL divergence for gaussians
 # See https://github.com/kumar-shridhar/PyTorch-BayesianCNN/blob/master/metrics.py
