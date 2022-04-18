@@ -31,11 +31,31 @@ def reliability_diagram(bin_count, errors, confidences, ax=None):
 
     mce = np.max(np.abs(bin_accuracys - bin_confidences))
 
+    ace = calculate_ace(bin_count, errors, confidences)
+
     ident = [0.0, 1.0]
     ax.plot(ident,ident,linestyle='--',color="tab:grey")
 
-    ax.text(0.08, 0.9, f"ECE: {ece:.2f}\nMCE: {mce:.2f}", 
+    ax.text(0.08, 0.9, f"ECE: {ece:.2f}\nMCE: {mce:.2f}\nACE: {ace:.2f}", 
         transform=ax.transAxes, fontsize=16, verticalalignment="top", 
         bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
 
     return ece, mce
+
+def calculate_ace(bin_count, errors, confidences):
+    sorted_conf, sort_indices = torch.sort(confidences)
+
+    conf_chunks = torch.chunk(sorted_conf, bin_count)
+    error_chunks = torch.chunk(errors[sort_indices], bin_count)
+
+    bin_accuracys = torch.stack([chunk.mean() for chunk in error_chunks])
+    bin_confidences = torch.stack([chunk.mean() for chunk in conf_chunks])
+
+    print(f"ACE average confidences: {bin_confidences}")
+
+    ace = 0
+    for i in range(bin_count):
+        ace += len(conf_chunks[i]) * (bin_accuracys[i] - bin_confidences[i]).abs()
+    ace /= len(confidences)
+
+    return ace

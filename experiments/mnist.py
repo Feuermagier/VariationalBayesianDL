@@ -28,8 +28,15 @@ def testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.Da
     dataset = torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=transform)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
-def fashion_trainloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
+def fashion_trainloader(batch_size: int = 5, shuffle: bool = True, exclude_classes = []) -> torch.utils.data.DataLoader:
     dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, download=True, transform=transform)
+    indices = torch.full_like(dataset.targets, False)
+    for i in range(10):
+        if not i in exclude_classes:
+            indices |= dataset.targets == i
+    dataset.targets = dataset.targets[indices]
+    dataset.data = dataset.data[indices]
+    print(dataset.data.shape)
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 def fashion_testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
