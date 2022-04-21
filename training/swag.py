@@ -56,7 +56,7 @@ class SWAGWrapper:
                 self.deviations[:,-1] = params - self.weights
                 self.param_dist_valid = False
                 if self.use_lr_cycles:
-                    print(f"SWAG: Collected a sample at epoch {epoch}, batch {batch_idx} with last lr {self.lr}")
+                    print(f"SWAG: Collected a sample at epoch {epoch}, batch {batch_idx}")
 
             if self.use_lr_cycles:
                 t = 1 - (self.batches_since_swag_start % self.update_every_batches) / self.update_every_batches

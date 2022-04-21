@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from itertools import repeat
 import numpy as np
 import torch
@@ -15,7 +16,7 @@ from training.swag import SWAGWrapper
 from training.bbb import BBBConvolution, run_bbb_epoch, BBBLinear, GaussianPrior
 from training.calibration import reliability_diagram
 
-def eval_model(name, eval_fn, losses, samples, testloader, device):
+def eval_model(name, eval_fn, losses, samples, testloader, device, include_ace=True):
     # Test performance
     errors = torch.empty(0)
     confidences = torch.empty(0)
@@ -29,19 +30,67 @@ def eval_model(name, eval_fn, losses, samples, testloader, device):
             confidences = torch.cat((confidences, confs))
     accuracy = errors.sum() / len(errors)
 
-    fig = plt.figure(figsize=(15, 5))
+    fig = plt.figure(figsize=(12, 5))
+    fig.set_tight_layout(True)
     fig.suptitle(name + f" (Test Accuracy {accuracy:.3f})", fontsize=16)
     epochs = len(losses)
 
     # Plot loss over time
     loss_ax = fig.add_subplot(1, 2, 1)
-    loss_ax.set_xlabel("Epochs", fontsize=14)
+    loss_ax.set_xlabel("Epoch", fontsize=14)
     loss_ax.set_xticks(np.arange(1, epochs + 1, 1))
-    loss_ax.set_ylabel("Training Loss", fontsize=14)
+    loss_ax.set_ylabel("Training NLL Loss", fontsize=14)
     loss_ax.plot(np.arange(1, epochs + 1, 1), losses)
 
     rel_ax = fig.add_subplot(1, 2, 2)
-    reliability_diagram(10, errors, confidences, rel_ax)
+    reliability_diagram(10, errors, confidences, rel_ax, include_ace)
+
+    return fig
+
+# models = [(name, eval_fn, loss_over_time, [ece_over_time per dataset in the same order], eval_samples)]
+# datasets = [(name, dataloader)]
+def eval_multiple(models, datasets, device, include_ace=True, include_mce=False):
+    width = len(models)
+    height = len(datasets) + 1 # 2 * len(dataset) + 1
+    fig = plt.figure(figsize=(8 * width, 5 * height))
+    #fig.suptitle(name + f" (Test Accuracy {accuracy:.3f})", fontsize=16)
+
+    for i, (name, _, loss_over_time, _, _) in enumerate(models):
+        loss_ax = fig.add_subplot(height, width, i + 1)
+        loss_ax.annotate(name, xy=(0.5, 1), xytext=(0, 10), xycoords="axes fraction", textcoords="offset points",  ha="center", va="center", fontsize=16)
+        loss_ax.set_xlabel("Epoch", fontsize=14)
+        loss_ax.set_xticks(np.arange(1, len(loss_over_time) + 1, 1))
+        loss_ax.set_ylabel("Training NLL Loss", fontsize=14)
+        loss_ax.plot(np.arange(1, len(loss_over_time) + 1, 1), loss_over_time)
+
+    for i, (name, loader) in enumerate(datasets):
+        for j, (_, eval_fn, _, eces, eval_samples) in enumerate(models):
+            # ece_ax = fig.add_subplot(height, width, (2 * i + 1) * width + j + 1)
+            # ece_ax.set_xlabel("Epoch", fontsize=14)
+            # ece_ax.set_xticks(np.arange(1, len(eces) + 1, 1))
+            # ece_ax.set_ylabel("ECE", fontsize=14)
+            # if eces != []:
+            #     ece_ax.plot(np.arange(1, len(eces) + 1, 1), eces)
+
+            rel_ax = fig.add_subplot(height, width, (i + 1) * width + j + 1)
+            errors = torch.empty(0)
+            confidences = torch.empty(0)
+            with torch.no_grad():
+                for data, target in loader:
+                    outputs = torch.stack(eval_fn(data.to(device), eval_samples)).cpu()
+                    sample_preds = torch.transpose(torch.argmax(outputs, dim=2), 0, 1)
+                    preds = torch.mode(sample_preds, dim=1)[0]
+                    errors = torch.cat((errors, preds == target))
+                    confs = outputs[:,torch.arange(outputs.shape[1]),preds].mean(dim=0).exp()
+                    confidences = torch.cat((confidences, confs))
+            reliability_diagram(10, errors, confidences, rel_ax)
+
+            if j == 0:
+                rel_ax.annotate(name, xy=(0, 0.5), xytext=(-rel_ax.yaxis.labelpad - 10, 0), xycoords=rel_ax.yaxis.label, textcoords="offset points", fontsize=16, ha="left", va="center")
+
+    fig.tight_layout()
+    fig.subplots_adjust(left=0.2, top=0.95)
+    return fig
 
 def point_predictor(layers, epochs, dataloader, batch_size, device):
     pp_model = util.generate_model(layers)
@@ -70,11 +119,11 @@ def point_predictor(layers, epochs, dataloader, batch_size, device):
 
     return eval_pp, losses
 
-def swag(layers, epochs, dataloader, batch_size, swag_config, device):
+def swag(layers, epochs, dataloader, batch_size, swag_config, device, use_lr_cycles = False):
     swag_model = util.generate_model(layers)
     swag_model.to(device)
     optimizer = torch.optim.SGD(swag_model.parameters(), lr=0.01)
-    wrapper = SWAGWrapper(swag_model, optimizer, swag_config, device)
+    wrapper = SWAGWrapper(swag_model, optimizer, swag_config, device, use_lr_cycles)
     losses = []
     for epoch in range(epochs):
         epoch_loss = torch.tensor(0, dtype=torch.float)

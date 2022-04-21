@@ -3,45 +3,83 @@ import torch
 import torchvision
 from torchvision.transforms import transforms
 import matplotlib.pyplot as plt
+import random
+
+# Python-Fu to import from mnist-c which has a dash in it
+import importlib
+import os
+os.chdir("./mnist-c/")
+mnist_c = importlib.import_module("corruptions", "mnist-c")
+os.chdir("..")
 
 IMAGE_SIZE = 28
-
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(0.5, 0.5)
-])
 
 def _flatten(x):
     return torch.flatten(x)
 
-flattening_transform = transforms.Compose([
-  transforms.ToTensor(),
-  transforms.Normalize(0,5, 0.5),
-  transforms.Lambda(_flatten)
-])
+# Currently not used
+class CorruptTransform:
+    def __init__(self, seed):
+        self.rng = random.Random(seed)
 
-def trainloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
-    dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, transform=transform)
+    def __call__(self, x):
+        corruption = self.rng.choice(mnist_c.CORRUPTIONS)
+        return getattr(mnist_c, corruption)(x)
+
+def gen_transform(flatten):
+    transform = [transforms.Grayscale()]
+
+    transform.append(transforms.ToTensor())
+    transform.append(transforms.Normalize(0.5, 0.5))
+
+    if flatten:
+        transform.append(transforms.Lambda(_flatten))
+
+    return transforms.Compose(transform)
+
+def trainloader(batch_size: int = 5, shuffle: bool = True, flatten: bool = False) -> torch.utils.data.DataLoader:
+    dataset = torchvision.datasets.MNIST(root="./data", train=True, download=True, transform=gen_transform(flatten))
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-def testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
-    dataset = torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=transform)
+def testloader(batch_size: int = 5, shuffle: bool = True, flatten: bool = False) -> torch.utils.data.DataLoader:
+    dataset = torchvision.datasets.MNIST(root="./data", train=False, download=True, transform=gen_transform(flatten))
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
-def fashion_trainloader(batch_size: int = 5, shuffle: bool = True, exclude_classes = []) -> torch.utils.data.DataLoader:
-    dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, download=True, transform=transform)
-    indices = torch.full_like(dataset.targets, False)
+def fashion_trainloader(batch_size: int = 5, shuffle: bool = True, exclude_classes = [], flatten: bool = False) -> torch.utils.data.DataLoader:
+    dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, download=True, transform=gen_transform(flatten))
+    _select_classes(dataset, exclude_classes)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
+
+def fashion_testloader(batch_size: int = 5, shuffle: bool = True, exclude_classes = [], flatten: bool = False) -> torch.utils.data.DataLoader:
+    dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, download=True, transform=gen_transform(flatten))
+    _select_classes(dataset, exclude_classes)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
+
+class CorruptedFashionMNIST(torchvision.datasets.ImageFolder):
+    def __init__(self, root, transform, exclude_classes):
+        self.exclude_classes = exclude_classes
+        super().__init__(root, transform)
+
+    def find_classes(self, directory):
+        orig_classes, orig_mappings = super().find_classes(directory)
+        for c in self.exclude_classes:
+            orig_classes.remove(str(c))
+            orig_mappings.pop(str(c))
+        return orig_classes, orig_mappings
+
+
+def corrupted_fashion_testloader(batch_size: int = 5, shuffle: bool = True, exclude_classes = [], flatten: bool = False) -> torch.utils.data.DataLoader:
+    dataset = torchvision.datasets.ImageFolder("./data/FashionMNIST-Test(C)", gen_transform(flatten))
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
+
+
+def _select_classes(dataset, exclude_classes):
+    indices = torch.full_like(dataset.targets, False, dtype=torch.bool)
     for i in range(10):
         if not i in exclude_classes:
             indices |= dataset.targets == i
     dataset.targets = dataset.targets[indices]
     dataset.data = dataset.data[indices]
-    print(dataset.data.shape)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-def fashion_testloader(batch_size: int = 5, shuffle: bool = True) -> torch.utils.data.DataLoader:
-    dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, download=True, transform=transform)
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
 def imshow(img):
     #img = img.reshape((IMAGE_SIZE, IMAGE_SIZE, 1)) # unflatten
