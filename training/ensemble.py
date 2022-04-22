@@ -25,3 +25,13 @@ class SimpleEnsemble(nn.Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         output = torch.tensor([module(input) for module in self.modules])
         return output.mean()
+
+class Ensemble(nn.Module):
+    def __init__(self, modules):
+        super().__init__()
+        self.modules = modules
+
+    def train(self, *args, **kwargs):
+        for i, module in enumerate(self.modules):
+            print(f"Training ensemble member {i}")
+            module.train(*args, **kwargs)

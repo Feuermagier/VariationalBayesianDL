@@ -6,7 +6,66 @@ import torch.nn.functional as F
 import itertools
 import math
 import time
-from .util import GaussianMixture
+from .util import GaussianMixture, generate_model
+
+class BBBModel(nn.Module):
+    def __init__(self, prior, sampling, layers):
+        super().__init__()
+
+        def linear_fn(i, o): return BBBLinear(
+            i, o, prior, prior, sampling=sampling)
+
+        def conv_fn(i, o, k): return BBBConvolution(
+            i, o, k, prior, prior, sampling=sampling)
+
+        self.model = generate_model(layers, linear_fn=linear_fn, conv_fn=conv_fn)
+        self.losses = []
+
+    def save(self, path):
+        torch.save({
+            "model": self.model.state_dict(),
+            "losses": self.losses
+        }, path)
+
+    def load(self, path):
+        state = torch.load(path)
+        self.model.load_state_dict(state["model"])
+        self.losses = state["losses"]
+
+    def train(self, epochs, data_loss_fn, optimizer, loader, batch_size, device, mc_samples=5, kl_rescaling=1, report_every_epochs=1):
+        self.model.to(device)
+        self.model.train()
+        pi = kl_rescaling / len(loader)
+
+        for epoch in range(epochs):
+            epoch_loss = torch.tensor(0, dtype=torch.float)
+            for data, target in loader:
+                data, target = data.to(device), target.to(device)
+                optimizer.zero_grad()
+
+                loss = torch.tensor(0, dtype=torch.float)
+                for _ in range(mc_samples):
+                    output = self.model(data)
+                    kl = sum([getattr(layer, "kl", 0) for layer in self.model])
+                    loss += (pi * kl + data_loss_fn(output, target)).cpu()
+                loss /= mc_samples
+
+                loss.backward()
+                nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
+                optimizer.step()
+                epoch_loss += loss
+            epoch_loss /= (len(loader) * batch_size)
+            self.losses.append(epoch_loss.detach())
+            if report_every_epochs > 0 and epoch % report_every_epochs == 0:
+                print(f"Epoch {epoch}: loss {epoch_loss}")
+        if report_every_epochs >= 0:
+            print(f"Final loss {epoch_loss}")
+
+    def infer(self, input, samples):
+        return [self.model(input) for _ in range(samples)]
+
+    def all_losses(self):
+        return [self.losses]
 
 def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_fn, loader: torch.utils.data.DataLoader, device: torch.device, **kwargs) -> torch.Tensor:
     samples = kwargs.get("samples", 1)
@@ -36,14 +95,13 @@ def run_bbb_epoch(model: nn.Sequential, optimizer: torch.optim.Optimizer, loss_f
 
 
 class BBBLinear(nn.Module):
-    def __init__(self, in_features: int, out_features: int, weight_prior, bias_prior, device: torch.device, **kwargs):
+    def __init__(self, in_features: int, out_features: int, weight_prior, bias_prior, **kwargs):
         super().__init__()
         self.is_bayesian = True
         self.sampling = kwargs.get("sampling", "activations")
         self.mc_sample = kwargs.get("mc_sample", 1)
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
-        self.device = device
         self.in_features, self.out_features = in_features, out_features
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
 
@@ -58,7 +116,7 @@ class BBBLinear(nn.Module):
         self.kl = 0
 
     def sample_parameters(self, mu, sigma):
-        epsilon = torch.empty(sigma.shape).normal_(0, 1).to(self.device)
+        epsilon = torch.empty(sigma.shape).normal_(0, 1).to(mu.device)
         return mu + sigma * epsilon
 
     def forward(self, input: torch.Tensor):
@@ -88,9 +146,9 @@ class BBBLinear(nn.Module):
             activation_std = torch.sqrt(activation_var)
 
             if not self.training and self.freeze_on_eval:
-                epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(self.device)
+                epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(activation_mu.device)
             else:
-                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
+                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(activation_mu.device)
             output = activation_mu + activation_std * epsilon
             
             if self.training or self.kl_on_eval:
@@ -105,14 +163,13 @@ class BBBLinear(nn.Module):
             raise ValueError("Invalid value of sampling")
 
 class BBBConvolution(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, weight_prior, bias_prior, device: torch.device, **kwargs):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, weight_prior, bias_prior, **kwargs):
         super().__init__()
         self.is_bayesian = True
         self.sampling = kwargs.get("sampling", "activations")
         self.stride = kwargs.get("stride", 1)
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
-        self.device = device
         self.out_channels, self.in_channels = out_channels, in_channels
         self.kernel_size = kernel_size
 
@@ -143,9 +200,9 @@ class BBBConvolution(nn.Module):
             activation_std = torch.sqrt(activation_var)
 
             if not self.training and self.freeze_on_eval:
-                epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(self.device)
+                epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(activation_mu.device)
             else:
-                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(self.device)
+                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(activation_mu.device)
             output = activation_mu + activation_std * epsilon
 
             if self.training or self.kl_on_eval:
