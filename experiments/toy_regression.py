@@ -6,17 +6,30 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import transforms
-import itertools
-import importlib
-import time
-import math
+import matplotlib.pyplot as plt
 from training import util
 from training.swag import SWAGWrapper
 from training.bbb import run_bbb_epoch, BBBLinear, GaussianPrior
 import gpytorch
 from bayesian_torch.models.dnn_to_bnn import dnn_to_bnn, get_kl_loss
 
-def gaussian_process(epochs, xs, ys):
+def plot_calibration(eval_fn, xs, ys, samples, quantile_steps):
+    frequencies = torch.zeros(quantile_steps)
+    outputs = eval_fn(xs, samples)
+    means = torch.stack([mean for mean in outputs])
+    quantile_ps = torch.linspace(0, 1, quantile_steps)
+    quantiles = torch.stack([torch.quantile(means, p, dim=0) for p in quantile_ps])
+
+    for i, quantile in enumerate(quantiles):
+        frequencies[i] = (ys <= quantile).sum()
+
+    empirical_quantiles = frequencies / len(xs)
+    plt.xlabel("Expected Confidence Level")
+    plt.ylabel("Observed Confidence Level")
+    plt.plot([0, 1], [0,1])
+    plt.plot(quantile_ps, empirical_quantiles, "o-")
+
+def gaussian_process(epochs, xs, ys, variance):
     class GPModel(gpytorch.models.ExactGP):
         def __init__(self, likelihood):
             super().__init__(xs, ys, likelihood)
@@ -28,7 +41,7 @@ def gaussian_process(epochs, xs, ys):
             covar_x = self.covar_module(x)
             return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
-    likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=variance.expand(xs.shape[0]))
     gp = GPModel(likelihood)
 
     gp.train()
@@ -50,13 +63,14 @@ def gaussian_process(epochs, xs, ys):
         likelihood.eval()
         with torch.no_grad():
             dist = gp(input.squeeze(-1))
-            outputs = [(dist.sample(), likelihood.noise) for _ in range(samples)]
+            outputs = [dist.sample() for _ in range(samples)]
             return outputs
 
     def gp_true_lml(input, y):
+        likelihood.noise = variance.expand(input.shape[0])
         with torch.no_grad():
             dist = gp(input.squeeze(-1))
-            return mll(dist, y) * len(input)
+            return mll(dist, y) * dist.event_shape.numel()
 
     return eval_gp, gp_true_lml
 

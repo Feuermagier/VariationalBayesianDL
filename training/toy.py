@@ -50,7 +50,7 @@ class RegressionToyDataset(torch.utils.data.Dataset):
             outputs = eval_fn(torch.unsqueeze(t * self.x_norm, -1), samples)
         return outputs
 
-    def plot(self, name, eval_fn, gp_eval, extra_range=0.01, plot_sigma=False, alpha=1, samples=100, plot_lml_trend=None, gp_lml=None):
+    def plot(self, name, eval_fn, gp_eval, variance, extra_range=0.01, plot_sigma=False, alpha=1, samples=100, plot_lml_trend=None, gp_lml=None):
         fig = plt.figure(figsize=(15, 6))
         fig.suptitle(name, fontsize=16)
 
@@ -66,9 +66,9 @@ class RegressionToyDataset(torch.utils.data.Dataset):
         # Plot samples and calculate MSEs
         means = torch.empty((samples, t.shape[0]))
         mses = torch.empty(samples)
-        for i, (mean, variance) in enumerate(outputs):
+        for i, mean in enumerate(outputs):
             mean = torch.squeeze(mean, -1).detach() / self.y_norm
-            variance = torch.squeeze(variance, -1).detach() / self.y_norm**2
+            #variance = torch.squeeze(variance, -1).detach() / self.y_norm**2
             means[i] = mean
             mse = F.mse_loss(mean, y)
             mses[i] = mse
@@ -81,10 +81,10 @@ class RegressionToyDataset(torch.utils.data.Dataset):
                 data_ax.fill_between(t, lower_bound, higher_bound, color="lightgrey")
 
         total_mean = means.mean(dim=0)
-        log_marginal_likelihood = calculate_lml_gaussian(y, outputs)
+        log_marginal_likelihood = calculate_lml_gaussian(y, outputs, variance)
 
         wasserstein_dists = []
-        ref_means, _ = zip(*gp_eval(t, samples))
+        ref_means = gp_eval(t, samples)
         ref_means = torch.stack(ref_means)
         for mean, ref_mean in zip(means.T, ref_means.T):
             wasserstein_dists.append(wasserstein_distance(mean, ref_mean))
@@ -112,7 +112,7 @@ class RegressionToyDataset(torch.utils.data.Dataset):
                 lml_samples = []
                 for _ in range(10):
                     outputs = self.generate_samples(eval_fn, s, t)
-                    lml_samples.append(calculate_lml_gaussian(y, outputs))
+                    lml_samples.append(calculate_lml_gaussian(y, outputs, variance))
                 lmls.append(sum(lml_samples) / len(lml_samples))
             lml_ax = fig.add_subplot(1, 2, 2)
             if gp_lml is not None:
@@ -136,10 +136,10 @@ class RegressionToyDataset(torch.utils.data.Dataset):
         axis.plot(t, y, color="blue")
         axis.scatter(self.xs, self.ys, s=4, color="blue")
 
-def calculate_lml_gaussian(target, samples):
+def calculate_lml_gaussian(target, samples, var):
     assert len(samples) > 0
     log_likelihoods = torch.empty(len(samples))
-    for i, (mean, var) in enumerate(samples):
+    for i, mean in enumerate(samples):
         log_likelihoods[i] = gauss_logprob(mean, var, target).sum()
     return -math.log(len(samples)) + torch.logsumexp(log_likelihoods, dim=0)
 

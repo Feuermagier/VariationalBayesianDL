@@ -9,8 +9,9 @@ import time
 from .util import GaussianMixture, generate_model
 
 class BBBModel(nn.Module):
-    def __init__(self, prior, sampling, layers):
+    def __init__(self, prior, sampling, layers, infer_samples = 100):
         super().__init__()
+        self.infer_samples = infer_samples
 
         def linear_fn(i, o): return BBBLinear(
             i, o, prior, prior, sampling=sampling)
@@ -62,6 +63,7 @@ class BBBModel(nn.Module):
             print(f"Final loss {epoch_loss}")
 
     def infer(self, input, samples):
+        self.model.eval()
         return [self.model(input) for _ in range(samples)]
 
     def all_losses(self):
