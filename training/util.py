@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import numpy as np
 
 def gauss_logprob(mean: torch.Tensor, variance: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     #var = torch.max(torch.tensor(1e-6), variance)
@@ -46,7 +47,7 @@ def map_activation(name):
     else:
         raise ValueError(f"Unknown activation function {name}")
 
-def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o), conv_fn=lambda i, o, k: nn.Conv2d(i, o, k), dropout_p=0):
+def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o), conv_fn=lambda i, o, k: nn.Conv2d(i, o, k), dropout_p=0, dropout_fn=lambda p: nn.Dropout(p)):
     layers = []
     for i, (ty, size) in enumerate(architecture):
         if ty == "pool":
@@ -65,7 +66,7 @@ def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o)
             out_features_scaled = out_features if i == len(architecture) - 1 else int(out_features * scale)
             layers.append(linear_fn(int(in_features_scaled), int(out_features_scaled)))
             if i < len(architecture) - 1 and dropout_p > 0:
-                layers.append(nn.Dropout(dropout_p))
+                layers.append(dropout_fn(dropout_p))
         elif ty == "conv":
             (in_channels, out_channels, kernel_size) = size
             layers.append(conv_fn(in_channels, out_channels, kernel_size))
@@ -75,3 +76,15 @@ def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o)
     print(f"Generated model: {model}")
     print(f"{sum([p.numel() for p in model.parameters() if p.requires_grad])} trainable parameters")
     return model
+
+def plot_losses(name, losses, ax):
+    epochs = max([len(loss) for loss in losses])
+    ax.set_xlabel("Epoch", fontsize=14)
+    ax.set_xticks(np.arange(0, epochs + 1, epochs // 10))
+    ax.set_ylabel("Training Loss", fontsize=14)
+    if len(losses) > 1:
+        for i, single_losses in enumerate(losses):
+            ax.plot(np.arange(1, len(single_losses) + 1, 1), single_losses, label=f"{name} ({i})")
+    else:
+        ax.plot(np.arange(1, len(losses[0]) + 1, 1), losses[0], label=name)
+    ax.legend(loc="upper right")

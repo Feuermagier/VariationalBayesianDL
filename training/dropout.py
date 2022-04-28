@@ -1,15 +1,14 @@
-from pickletools import optimize
 import torch
 import torch.nn as nn
 from .util import generate_model
 
-class PointPredictor(nn.Module):
-    def __init__(self, layers):
+class MonteCarloDropoutModule(nn.Module):
+    def __init__(self, layers, p):
         super().__init__()
-        self.model = generate_model(layers)
+        self.model = generate_model(layers, dropout_p=p, dropout_fn=lambda p: FixableDropout(p))
         self.losses = []
 
-    def state_dict(self, ):
+    def state_dict(self):
         return {
             "model": self.model.state_dict(),
             "losses": self.losses
@@ -42,7 +41,22 @@ class PointPredictor(nn.Module):
             print(f"Final loss {epoch_loss}")
 
     def infer(self, input, samples):
+        self.model.train()  # Enable dropout
         return [self.model(input) for _ in range(samples)]
 
     def all_losses(self):
         return [self.losses]
+
+class FixableDropout(nn.Module):
+    def __init__(self, p, freeze_on_eval=True):
+        super().__init__()
+        self.p = torch.tensor(1 - p)
+        self.freeze_on_eval = freeze_on_eval
+
+    def forward(self, x):
+        if not self.training and self.freeze_on_eval:
+            mask = self.p.expand(x.shape[1:])
+        elif self.freeze_on_eval:
+            mask = self.p.expand(x.shape)
+        mask = torch.bernoulli(mask).to(x.device)
+        return x * mask

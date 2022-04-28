@@ -17,21 +17,31 @@ def combined_variance_output(input, ensemble):
     variance = torch.mean(variances + means**2, dim=1) - mean**2 
     return mean, variance
 
-
-class SimpleEnsemble(nn.Module):
-    def __init__(self, module_init: Callable[[], nn.Module], count: int):
-        self.modules = [module_init() for _ in range(count)]
-    
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        output = torch.tensor([module(input) for module in self.modules])
-        return output.mean()
-
 class Ensemble(nn.Module):
-    def __init__(self, modules):
+    def __init__(self, models):
         super().__init__()
-        self.modules = modules
+        self.models = models
+
+    def state_dict(self):
+        return {
+            "models": [model.state_dict() for model in self.models]
+        }
+
+    def load_state_dict(self, dict):
+        for model, state in zip(self.models, dict["models"]):
+            model.load_state_dict(state)
+        print(self.models)
 
     def train(self, *args, **kwargs):
-        for i, module in enumerate(self.modules):
+        for i, model in enumerate(self.models):
             print(f"Training ensemble member {i}")
-            module.train(*args, **kwargs)
+            model.train(*args, **kwargs)
+
+    def infer(self, input, *args, **kwargs):
+        outputs = []
+        for model in self.models:
+            outputs.extend(model.infer(input, *args, **kwargs))
+        return outputs
+
+    def all_losses(self):
+        return [model.all_losses()[0] for model in self.models]

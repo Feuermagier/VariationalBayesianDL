@@ -18,6 +18,7 @@ from training.calibration import reliability_diagram
 
 
 def eval_model(name, eval_fn, losses, samples, testloader, device, include_ace=True):
+    torch.manual_seed(42)
     # Test performance
     errors = torch.empty(0)
     confidences = torch.empty(0)
@@ -55,6 +56,7 @@ def eval_model(name, eval_fn, losses, samples, testloader, device, include_ace=T
 
 
 def eval_multiple(models, datasets, device, include_ace=True, include_mce=False):
+    torch.manual_seed(42)
     width = len(models)
     height = len(datasets) + 1  # 2 * len(dataset) + 1
     fig = plt.figure(figsize=(8 * width, 5 * height))

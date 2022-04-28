@@ -22,20 +22,20 @@ class BBBModel(nn.Module):
         self.model = generate_model(layers, linear_fn=linear_fn, conv_fn=conv_fn)
         self.losses = []
 
-    def save(self, path):
-        torch.save({
+    def state_dict(self):
+        return {
             "model": self.model.state_dict(),
             "losses": self.losses
-        }, path)
+        }
 
-    def load(self, path):
-        state = torch.load(path)
-        self.model.load_state_dict(state["model"])
-        self.losses = state["losses"]
+    def load_state_dict(self, dict):
+        self.model.load_state_dict(dict["model"])
+        self.losses = dict["losses"]
 
-    def train(self, epochs, data_loss_fn, optimizer, loader, batch_size, device, mc_samples=5, kl_rescaling=1, report_every_epochs=1):
+    def train(self, epochs, data_loss_fn, optimizer_factory, loader, batch_size, device, mc_samples=5, kl_rescaling=1, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
+        optimizer = optimizer_factory(self.model.parameters())
         pi = kl_rescaling / len(loader)
 
         for epoch in range(epochs):

@@ -13,22 +13,6 @@ from training.bbb import run_bbb_epoch, BBBLinear, GaussianPrior
 import gpytorch
 from bayesian_torch.models.dnn_to_bnn import dnn_to_bnn, get_kl_loss
 
-def plot_calibration(eval_fn, xs, ys, samples, quantile_steps):
-    frequencies = torch.zeros(quantile_steps)
-    outputs = eval_fn(xs, samples)
-    means = torch.stack([mean for mean in outputs])
-    quantile_ps = torch.linspace(0, 1, quantile_steps)
-    quantiles = torch.stack([torch.quantile(means, p, dim=0) for p in quantile_ps])
-
-    for i, quantile in enumerate(quantiles):
-        frequencies[i] = (ys <= quantile).sum()
-
-    empirical_quantiles = frequencies / len(xs)
-    plt.xlabel("Expected Confidence Level")
-    plt.ylabel("Observed Confidence Level")
-    plt.plot([0, 1], [0,1])
-    plt.plot(quantile_ps, empirical_quantiles, "o-")
-
 def gaussian_process(epochs, xs, ys, variance):
     class GPModel(gpytorch.models.ExactGP):
         def __init__(self, likelihood):
@@ -63,7 +47,7 @@ def gaussian_process(epochs, xs, ys, variance):
         likelihood.eval()
         with torch.no_grad():
             dist = gp(input.squeeze(-1))
-            outputs = [dist.sample() for _ in range(samples)]
+            outputs = [dist.sample().unsqueeze(-1) for _ in range(samples)]
             return outputs
 
     def gp_true_lml(input, y):

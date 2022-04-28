@@ -49,9 +49,10 @@ class SwagModel(nn.Module):
         self.deviations = state["deviations"]
         self.param_dist_valid = False
 
-    def train(self, epochs, loss_fn, optimizer, loader, batch_size, device, report_every_epochs=1):
+    def train(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
+        optimizer = optimizer_factory(self.model.parameters())
 
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)
@@ -62,7 +63,7 @@ class SwagModel(nn.Module):
                 loss = loss_fn(output, target)
                 loss.backward()
                 optimizer.step()
-                epoch_loss += loss
+                epoch_loss += loss.cpu()
                 self.swag_update(epoch, batch_idx)
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
@@ -80,7 +81,7 @@ class SwagModel(nn.Module):
         self.update_param_dist()
         outputs = []
         for _ in range(samples):
-            weight_sample = self.param_dist.sample()
+            weight_sample = self.param_dist.sample().to(input.device)
             vector_to_parameters(weight_sample, self.model.parameters())
             outputs.append(self.model(input))
         vector_to_parameters(old_params, self.model.parameters())
@@ -107,7 +108,7 @@ class SwagModel(nn.Module):
 
             if self.batches_since_swag_start % self.update_every_batches == 0:
                 self.updates += 1
-                params = parameters_to_vector(self.model.parameters())
+                params = parameters_to_vector(self.model.parameters()).cpu()
                 self.weights = (self.updates * self.weights + params) / (self.updates + 1)
                 self.sq_weights = (self.updates * self.sq_weights + params**2) / (self.updates + 1)
                 self.deviations = torch.roll(self.deviations, -1, 1)
