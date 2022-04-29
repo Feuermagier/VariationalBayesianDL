@@ -24,7 +24,7 @@ def eval_model(name, eval_fn, losses, samples, testloader, device, include_ace=T
     confidences = torch.empty(0)
     with torch.no_grad():
         for data, target in testloader:
-            outputs = torch.stack(eval_fn(data.to(device), samples)).cpu()
+            outputs = eval_fn(data.to(device), samples).cpu()
             sample_preds = torch.transpose(torch.argmax(outputs, dim=2), 0, 1)
             preds = torch.mode(sample_preds, dim=1)[0]
             errors = torch.cat((errors, preds == target))
@@ -66,12 +66,7 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
         loss_ax = fig.add_subplot(height, width, i + 1)
         loss_ax.annotate(name, xy=(0.5, 1), xytext=(0, 10), xycoords="axes fraction",
                          textcoords="offset points",  ha="center", va="center", fontsize=16)
-        loss_ax.set_xlabel("Epoch", fontsize=14)
-        loss_ax.set_xticks(np.arange(1, len(loss_over_time) + 1, 1))
-        loss_ax.set_ylabel("Training NLL Loss", fontsize=14)
-        for single_losses in loss_over_time:
-            loss_ax.plot(
-                np.arange(1, len(single_losses) + 1, 1), single_losses)
+        util.plot_losses(name, loss_over_time, loss_ax)
 
     for i, (name, loader) in enumerate(datasets):
         for j, (_, eval_fn, _, eces, eval_samples) in enumerate(models):
@@ -87,8 +82,7 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
             confidences = torch.empty(0)
             with torch.no_grad():
                 for data, target in loader:
-                    outputs = torch.stack(
-                        eval_fn(data.to(device), eval_samples)).cpu()
+                    outputs = eval_fn(data.to(device), eval_samples).cpu()
                     sample_preds = torch.transpose(
                         torch.argmax(outputs, dim=2), 0, 1)
                     preds = torch.mode(sample_preds, dim=1)[0]

@@ -64,7 +64,7 @@ class BBBModel(nn.Module):
 
     def infer(self, input, samples):
         self.model.eval()
-        return [self.model(input) for _ in range(samples)]
+        return torch.stack([self.model(input) for _ in range(samples)])
 
     def all_losses(self):
         return [self.losses]

@@ -27,8 +27,8 @@ class SwagModel(nn.Module):
         self.param_dist = None
         self.batches_since_swag_start = 0
 
-    def save(self, path):
-        torch.save({
+    def state_dict(self):
+        return {
             "model": self.model.state_dict(),
             "losses": self.losses,
             "updates": self.updates,
@@ -36,10 +36,9 @@ class SwagModel(nn.Module):
             "weights": self.weights,
             "sq_weights": self.sq_weights,
             "deviations": self.deviations
-        }, path)
+        }
 
-    def load(self, path):
-        state = torch.load(path)
+    def load_state_dict(self, state):
         self.model.load_state_dict(state["model"])
         self.losses = state["losses"]
         self.updates = state["updates"]
@@ -85,7 +84,7 @@ class SwagModel(nn.Module):
             vector_to_parameters(weight_sample, self.model.parameters())
             outputs.append(self.model(input))
         vector_to_parameters(old_params, self.model.parameters())
-        return outputs
+        return torch.stack(outputs)
 
     def all_losses(self):
         return [self.losses]

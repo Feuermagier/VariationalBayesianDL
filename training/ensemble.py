@@ -20,7 +20,7 @@ def combined_variance_output(input, ensemble):
 class Ensemble(nn.Module):
     def __init__(self, models):
         super().__init__()
-        self.models = models
+        self.models = nn.ModuleList(models)
 
     def state_dict(self):
         return {
@@ -30,7 +30,6 @@ class Ensemble(nn.Module):
     def load_state_dict(self, dict):
         for model, state in zip(self.models, dict["models"]):
             model.load_state_dict(state)
-        print(self.models)
 
     def train(self, *args, **kwargs):
         for i, model in enumerate(self.models):
@@ -40,8 +39,8 @@ class Ensemble(nn.Module):
     def infer(self, input, *args, **kwargs):
         outputs = []
         for model in self.models:
-            outputs.extend(model.infer(input, *args, **kwargs))
-        return outputs
+            outputs.append(model.infer(input, *args, **kwargs))
+        return torch.concat(outputs)
 
     def all_losses(self):
         return [model.all_losses()[0] for model in self.models]

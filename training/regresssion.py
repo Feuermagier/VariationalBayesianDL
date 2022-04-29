@@ -11,7 +11,7 @@ from tabulate import tabulate
 from .util import gauss_logprob
 
 class RegressionResults:
-    def __init__(self, testloader, name, eval_fn, samples, variance, device, fit_gaussian=True, cal_steps=10):
+    def __init__(self, testloader, name, eval_fn, samples, device, fit_gaussian=True, cal_steps=10):
         self.name = name
 
         mean_mse = 0
@@ -24,14 +24,17 @@ class RegressionResults:
                 data, target = data.to(device), target.to(device)
                 datapoints += len(data)
                 torch.manual_seed(0) # Hoping that this produces deterministic outputs for correct LML calculation
-                outputs = torch.stack(eval_fn(data, samples)).cpu()
-                mean = outputs.mean(dim=0)
-                for output in outputs:
-                    mean_mse += F.mse_loss(output, target, reduction="sum")
-                mean_mse /= outputs.shape[0]
+                outputs = eval_fn(data, samples).cpu()
+                # outputs = [samples,batch_size,out_dim,2 = mean + var]
+                means = outputs[:,:,:,0]
+                vars = outputs[:,:,:,1]
+                mean = means.mean(dim=0)
+                for i in range(len(outputs)):
+                    mean_mse += F.mse_loss(means[i], target, reduction="sum")
+                    log_likelihoods_per_sample[i] += gauss_logprob(means[i], vars[i], target).sum()
+                mean_mse /= means.shape[0]
                 mse_of_means += F.mse_loss(mean, target, reduction="sum")
-                quantile_frequencies += calc_quantile_frequencies(outputs, target, cal_steps, fit_gaussian)
-                log_likelihoods_per_sample += gauss_logprob(mean, variance, target).sum()
+                quantile_frequencies += calc_quantile_frequencies(means, target, cal_steps, fit_gaussian)
 
         self.mean_mse = mean_mse / datapoints
         self.mse_of_means = mse_of_means / datapoints
@@ -65,7 +68,7 @@ def plot_calibration(title, results, ax):
         transform=ax.transAxes, fontsize=14, verticalalignment="top", 
         bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
 
-def plot_table(results):
+def plot_table(title, results):
     texts = [[res.name, f"{res.lml:.3f}", f"{res.mean_mse:.3f}", f"{res.mse_of_means:.3f}", f"{res.qce:.3f}"] for res in results]
-    cols = ("Method", "LML", "Mean MSE", "MSE of Means", "QCE")
+    cols = (title, "LML", "Mean MSE", "MSE of Means", "QCE")
     print(tabulate(texts, headers=cols, tablefmt='orgtbl'))

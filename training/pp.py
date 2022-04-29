@@ -9,7 +9,7 @@ class PointPredictor(nn.Module):
         self.model = generate_model(layers)
         self.losses = []
 
-    def state_dict(self, ):
+    def state_dict(self):
         return {
             "model": self.model.state_dict(),
             "losses": self.losses
@@ -42,7 +42,7 @@ class PointPredictor(nn.Module):
             print(f"Final loss {epoch_loss}")
 
     def infer(self, input, samples):
-        return [self.model(input) for _ in range(samples)]
+        return torch.stack([self.model(input) for _ in range(samples)])
 
     def all_losses(self):
         return [self.losses]

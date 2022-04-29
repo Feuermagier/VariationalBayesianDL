@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 import numpy as np
+import itertools
 
 def gauss_logprob(mean: torch.Tensor, variance: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     #var = torch.max(torch.tensor(1e-6), variance)
@@ -22,18 +23,42 @@ class GaussianMixture:
         return torch.logaddexp(self.log_pi + self.gaussian1.log_prob(value), self.log_pi + self.gaussian2.log_prob(value))
 
 class GaussWrapper(nn.Module):
-    def __init__(self, mean: nn.Module, var: torch.Tensor, learn_var: bool = False):
+    def __init__(self, mean, var_init: torch.Tensor, learn_var: bool = False):
         super().__init__()
         self.mean = mean
-        self.rho = torch.log(torch.exp(var) - 1)
+        self.rho = torch.log(torch.exp(var_init) - 1).unsqueeze(0)
         if learn_var:
             self.rho = nn.Parameter(self.rho)
+        self.learn_var = learn_var
 
     def forward(self, input):
+        print(F.softplus(self.rho))
         return self.mean(input), F.softplus(self.rho).repeat(input.shape[0])
 
-    def __iter__(self):
-        return iter(self.mean)
+    def state_dict(self):
+        return {
+            "mean": self.mean.state_dict(),
+            "rho": self.rho
+        }
+
+    def load_state_dict(self, state):
+        self.mean.load_state_dict(state["mean"])
+        self.rho = state["rho"]
+
+    def train(self, epochs, optimizer_factory, loss_reduction, *args, **kwargs):
+        if self.learn_var:
+            optimizer_factory_ext = lambda p: optimizer_factory(list(p) + [self.rho])
+        else:
+            optimizer_factory_ext = optimizer_factory
+        
+        loss_fn = lambda output, target: F.gaussian_nll_loss(output, target, F.softplus(self.rho).repeat(output.shape[0]), reduction=loss_reduction)
+        self.mean.train(epochs, loss_fn, optimizer_factory_ext, *args, **kwargs)
+        
+
+    def infer(self, input, samples):
+        means = self.mean.infer(input, samples)
+        return torch.stack((means, F.softplus(self.rho).expand(means.shape)), dim=-1)
+        #return list(zip(self.mean.infer(input, samples), F.softplus(self.rho).repeat(samples)))
 
 def map_activation(name):
     if name == "relu":
