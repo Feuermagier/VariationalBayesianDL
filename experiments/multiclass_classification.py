@@ -20,17 +20,24 @@ from training.calibration import reliability_diagram
 def eval_model(name, eval_fn, losses, samples, testloader, device, include_ace=True):
     torch.manual_seed(42)
     # Test performance
-    errors = torch.empty(0)
-    confidences = torch.empty(0)
+    errors = []
+    confidences = []
     with torch.no_grad():
         for data, target in testloader:
-            outputs = eval_fn(data.to(device), samples).cpu()
-            sample_preds = torch.transpose(torch.argmax(outputs, dim=2), 0, 1)
-            preds = torch.mode(sample_preds, dim=1)[0]
-            errors = torch.cat((errors, preds == target))
-            confs = outputs[:, torch.arange(
-                outputs.shape[1]), preds].mean(dim=0).exp()
-            confidences = torch.cat((confidences, confs))
+            output = eval_fn(data.to(device), samples).mean(dim=0).cpu()
+            preds = torch.argmax(output, dim=1)
+            errors.append(preds == target)
+            confidences.append(output[torch.arange(output.shape[0]), preds].exp())
+            # outputs = eval_fn(data.to(device), samples).cpu()
+            # sample_preds = torch.transpose(
+            #     torch.argmax(outputs, dim=2), 0, 1)
+            # preds = torch.mode(sample_preds, dim=1)[0]
+            # errors = torch.cat((errors, preds == target))
+            # confs = outputs[:, torch.arange(
+            #     outputs.shape[1]), preds].mean(dim=0).exp()
+            # confidences = torch.cat((confidences, confs))
+    errors = torch.cat(errors)
+    confidences = torch.cat(confidences)
     accuracy = errors.sum() / len(errors)
 
     fig = plt.figure(figsize=(12, 5))
@@ -78,19 +85,25 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
             #     ece_ax.plot(np.arange(1, len(eces) + 1, 1), eces)
 
             rel_ax = fig.add_subplot(height, width, (i + 1) * width + j + 1)
-            errors = torch.empty(0)
-            confidences = torch.empty(0)
+            errors = []
+            confidences = []
             with torch.no_grad():
                 for data, target in loader:
-                    outputs = eval_fn(data.to(device), eval_samples).cpu()
-                    sample_preds = torch.transpose(
-                        torch.argmax(outputs, dim=2), 0, 1)
-                    preds = torch.mode(sample_preds, dim=1)[0]
-                    errors = torch.cat((errors, preds == target))
-                    confs = outputs[:, torch.arange(
-                        outputs.shape[1]), preds].mean(dim=0).exp()
-                    confidences = torch.cat((confidences, confs))
-            reliability_diagram(10, errors, confidences, rel_ax)
+                    output = eval_fn(data.to(device), eval_samples).mean(dim=0).cpu()
+                    preds = torch.argmax(output, dim=1)
+                    errors.append(preds == target)
+                    confidences.append(output[torch.arange(output.shape[0]), preds].exp())
+                    # outputs = eval_fn(data.to(device), eval_samples).cpu()
+                    # sample_preds = torch.transpose(
+                    #     torch.argmax(outputs, dim=2), 0, 1)
+                    # preds = torch.mode(sample_preds, dim=1)[0]
+                    # errors = torch.cat((errors, preds == target))
+                    # confs = outputs[:, torch.arange(
+                    #     outputs.shape[1]), preds].mean(dim=0).exp()
+                    # confidences = torch.cat((confidences, confs))
+            errors = torch.cat(errors)
+            confidences = torch.cat(confidences)
+            reliability_diagram(10, errors, confidences, rel_ax, include_ace, include_mce)
 
             if j == 0:
                 rel_ax.annotate(name, xy=(0, 0.5), xytext=(-rel_ax.yaxis.labelpad - 10, 0),

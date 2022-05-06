@@ -31,15 +31,19 @@ class Ensemble(nn.Module):
         for model, state in zip(self.models, dict["models"]):
             model.load_state_dict(state)
 
-    def train(self, *args, **kwargs):
+    def train_model(self, *args, **kwargs):
         for i, model in enumerate(self.models):
             print(f"Training ensemble member {i}")
-            model.train(*args, **kwargs)
+            model.train_model(*args, **kwargs)
 
-    def infer(self, input, *args, **kwargs):
+    def infer(self, input, samples, *args, **kwargs):
+        assert samples >= len(self.models)
         outputs = []
-        for model in self.models:
-            outputs.append(model.infer(input, *args, **kwargs))
+        for i, model in enumerate(self.models):
+            if i == len(self.models) - 1:
+                outputs.append(model.infer(input, samples - i * (samples // len(self.models)), *args, **kwargs))
+            else:
+                outputs.append(model.infer(input, samples // len(self.models), *args, **kwargs))
         return torch.concat(outputs)
 
     def all_losses(self):

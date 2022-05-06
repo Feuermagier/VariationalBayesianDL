@@ -45,20 +45,23 @@ class GaussWrapper(nn.Module):
         self.mean.load_state_dict(state["mean"])
         self.rho = state["rho"]
 
-    def train(self, epochs, optimizer_factory, loss_reduction, *args, **kwargs):
+    def train_model(self, epochs, optimizer_factory, loss_reduction, *args, **kwargs):
         if self.learn_var:
             optimizer_factory_ext = lambda p: optimizer_factory(list(p) + [self.rho])
         else:
             optimizer_factory_ext = optimizer_factory
         
         loss_fn = lambda output, target: F.gaussian_nll_loss(output, target, F.softplus(self.rho).repeat(output.shape[0]), reduction=loss_reduction)
-        self.mean.train(epochs, loss_fn, optimizer_factory_ext, *args, **kwargs)
+        self.mean.train_model(epochs, loss_fn, optimizer_factory_ext, *args, **kwargs)
         
 
     def infer(self, input, samples):
         means = self.mean.infer(input, samples)
         return torch.stack((means, F.softplus(self.rho).expand(means.shape)), dim=-1)
         #return list(zip(self.mean.infer(input, samples), F.softplus(self.rho).repeat(samples)))
+
+    def all_losses(self):
+        return self.mean.all_losses()
 
 def map_activation(name):
     if name == "relu":
@@ -72,7 +75,7 @@ def map_activation(name):
     else:
         raise ValueError(f"Unknown activation function {name}")
 
-def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o), conv_fn=lambda i, o, k: nn.Conv2d(i, o, k), dropout_p=0, dropout_fn=lambda p: nn.Dropout(p)):
+def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o), conv_fn=lambda i, o, k: nn.Conv2d(i, o, k), dropout_p=0, dropout_fn=lambda p: nn.Dropout(p), print_summary=False):
     layers = []
     for i, (ty, size) in enumerate(architecture):
         if ty == "pool":
@@ -98,8 +101,11 @@ def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o)
         else:
             raise ValueError(f"Unknown layer type '{ty}'")
     model = nn.Sequential(*layers)
-    print(f"Generated model: {model}")
-    print(f"{sum([p.numel() for p in model.parameters() if p.requires_grad])} trainable parameters")
+
+    if print_summary:
+        print(f"Generated model: {model}")
+        print(f"{sum([p.numel() for p in model.parameters() if p.requires_grad])} trainable parameters")
+        
     return model
 
 def plot_losses(name, losses, ax):

@@ -9,15 +9,15 @@ import time
 from .util import GaussianMixture, generate_model
 
 class BBBModel(nn.Module):
-    def __init__(self, prior, sampling, layers, infer_samples = 100):
+    def __init__(self, prior, sampling, layers, infer_samples=100, init="foong"):
         super().__init__()
         self.infer_samples = infer_samples
 
         def linear_fn(i, o): return BBBLinear(
-            i, o, prior, prior, sampling=sampling)
+            i, o, prior, prior, sampling=sampling, initialization=init)
 
         def conv_fn(i, o, k): return BBBConvolution(
-            i, o, k, prior, prior, sampling=sampling)
+            i, o, k, prior, prior, sampling=sampling, initialization=init)
 
         self.model = generate_model(layers, linear_fn=linear_fn, conv_fn=conv_fn)
         self.losses = []
@@ -32,7 +32,7 @@ class BBBModel(nn.Module):
         self.model.load_state_dict(dict["model"])
         self.losses = dict["losses"]
 
-    def train(self, epochs, data_loss_fn, optimizer_factory, loader, batch_size, device, mc_samples=5, kl_rescaling=1, report_every_epochs=1):
+    def train_model(self, epochs, data_loss_fn, optimizer_factory, loader, batch_size, device, mc_samples=5, kl_rescaling=1, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
         optimizer = optimizer_factory(self.model.parameters())
@@ -47,12 +47,12 @@ class BBBModel(nn.Module):
                 loss = torch.tensor(0, dtype=torch.float)
                 for _ in range(mc_samples):
                     output = self.model(data)
-                    kl = sum([getattr(layer, "kl", 0) for layer in self.model])
+                    kl = sum([getattr(layer, "kl", 0) for layer in self.model]) / data.shape[0]
                     loss += (pi * kl + data_loss_fn(output, target)).cpu()
                 loss /= mc_samples
 
                 loss.backward()
-                nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
+                #nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
                 optimizer.step()
                 epoch_loss += loss
             epoch_loss /= (len(loader) * batch_size)
@@ -106,16 +106,42 @@ class BBBLinear(nn.Module):
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
         self.in_features, self.out_features = in_features, out_features
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
+        self.init = kwargs.get("initialization", "foong")
 
-        # Weights
-        self.weight_mu = nn.Parameter(torch.empty((self.out_features, self.in_features)).normal_(0, 0.1))
-        self.weight_rho = nn.Parameter(torch.empty((self.out_features, self.in_features)).uniform_(-3, -3))
+        self.weight_mu = nn.Parameter(torch.empty((self.out_features, self.in_features)))
+        self.weight_rho = nn.Parameter(torch.empty((self.out_features, self.in_features)))
 
-        # Biases
-        self.bias_mu = nn.Parameter(torch.empty(out_features).normal_(0, 0.1))
-        self.bias_rho = nn.Parameter(torch.empty(self.out_features).uniform_(-3, -3))
+        self.bias_mu = nn.Parameter(torch.empty((out_features,)))
+        self.bias_rho = nn.Parameter(torch.empty((self.out_features,)))
+
+        self.reset_parameters()
 
         self.kl = 0
+
+    def reset_parameters(self):
+        if self.init == "foong":
+            torch.nn.init.normal_(self.weight_mu, 0, 1 / math.sqrt(4 * self.out_features))
+            torch.nn.init.constant_(self.weight_rho, softplus_inverse(torch.tensor(1e-5)))
+
+            torch.nn.init.constant_(self.bias_mu, 0)
+            torch.nn.init.constant_(self.bias_rho, softplus_inverse(torch.tensor(1e-5)))
+        elif self.init == "blundell":
+            torch.nn.init.normal_(self.weight_mu, 0, 0.1)
+            torch.nn.init.constant_(self.weight_rho, -3)
+
+            torch.nn.init.normal_(self.bias_mu, 0, 0.1)
+            torch.nn.init.constant_(self.bias_rho, -3)
+        elif self.init == "wilson":
+            # https://github.com/izmailovpavel/understandingbdl/blob/master/experiments/deep_ensembles/1d%20regression_svi.ipynb
+            torch.nn.init.kaiming_uniform_(self.weight_mu, a=math.sqrt(5))
+            torch.nn.init.constant_(self.weight_rho, -3)
+            
+            fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight_mu)
+            bound= 1 / math.sqrt(fan_in)
+            torch.nn.init.uniform_(self.bias_mu, -bound, bound)
+            torch.nn.init.constant_(self.bias_rho, -3)
+        else:
+            raise ValueError(f"Unknown parameter init '{self.init}'")
 
     def sample_parameters(self, mu, sigma):
         epsilon = torch.empty(sigma.shape).normal_(0, 1).to(mu.device)
@@ -222,6 +248,9 @@ def to_sigma(rho):
 def log_prob(mu, sigma, value):
     #return torch.clamp(-((value - mu)**2) / (2 * sigma**2) - sigma.log() - math.log(math.sqrt(2 * math.pi)), -23, 0)
     return torch.clamp(torch.distributions.Normal(mu, sigma, False).log_prob(value), -23, 0)
+
+def softplus_inverse(x):
+    return torch.expm1(x).log()
 
 # Closed form KL divergence for gaussians
 # See https://github.com/kumar-shridhar/PyTorch-BayesianCNN/blob/master/metrics.py

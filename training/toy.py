@@ -8,47 +8,43 @@ from scipy.stats import wasserstein_distance
 import math
 from .util import gauss_logprob
 
-class RegressionToyDataset(torch.utils.data.Dataset):
-    def __init__(self, min: float, max: float, sample_count: int, normalize: bool, noise: float, skip):
+class RegressionToyDataset:
+    # data_areas = [(min, max, datapoints)]; must be sorted
+    def __init__(self, data_areas, noise):
         super().__init__()
-        self.min, self.max = min, max
 
-        if normalize:
-            self.x_norm = 1 / np.abs(max)
-            self.y_norm = 1 / np.abs(self.eval_value(torch.tensor(max)))
-        else:
-            self.x_norm = 1
-            self.y_norm = 1
+        # Generate datapoints
+        xs, ys = [], []
+        for (min, max, datapoints) in data_areas:
+            area_xs = min + (max - min) * torch.rand(datapoints)
+            area_ys = self.eval(area_xs, torch.normal(torch.zeros(datapoints), noise))
+            xs.append(area_xs)
+            ys.append(area_ys)
+        xs, ys = torch.cat(xs).unsqueeze(-1), torch.cat(ys).unsqueeze(-1)
 
-        self.xs, self.ys = _sample_from_fn(self.eval, min, max, sample_count, noise, skip)
-        self.normalized_xs, self.normalized_ys = self.xs * self.x_norm, self.ys * self.y_norm
-        xs, ys = torch.unsqueeze(self.normalized_xs, -1), torch.unsqueeze(self.normalized_ys, -1)
-        self.samples = [(x, y) for x, y in zip(xs, ys)] # Just using zip() doesn't work for some reason
+        # Shuffle
+        permutation = torch.randperm(xs.shape[0])
+        self.xs, self.ys = xs[permutation], ys[permutation]
 
-    def eval_value(self, value):
-        if isinstance(value, torch.Tensor):
-            return self.eval(value, torch.zeros(value.shape))
-        else:
-            return self.eval(torch.tensor(value), torch.tensor(0))
+        # Normalize
+        self.x_mean = torch.mean(self.xs, dim=0)
+        self.x_std = torch.std(self.xs, dim=0)
+        self.y_mean = torch.mean(self.ys, dim=0)
+        self.y_std = torch.std(self.ys, dim=0)
+        # self.x_mean = 0
+        # self.x_std = 1
+        # self.y_mean = 0
+        # self.y_std = 1
 
-    def __iter__(self):
-        return iter(self.samples)
+        self.normalized_xs = (xs - self.x_mean) / self.x_std
+        self.normalized_ys = (ys - self.y_mean) / self.y_std
 
-    def __len__(self):
-        return len(self.samples)
+        self.trainset = torch.utils.data.TensorDataset(self.normalized_xs, self.normalized_ys)
 
-    def __getitem__(self, key):
-        return self.samples[key]
-
-    def generate_eval_range(self, extra_range):
-        extra = (self.max - self.min) * extra_range
-        min, max = self.min - extra, self.max + extra
-        return torch.linspace(min, max, 100)
-
-    def generate_samples(self, eval_fn, samples, t):
-        with torch.no_grad():
-            outputs = eval_fn(torch.unsqueeze(t * self.x_norm, -1), samples)
-        return outputs
+    def generate_testset(self, min, max, datapoints, noise):
+        xs = torch.linspace(min, max, datapoints)
+        ys = self.eval(xs, torch.normal(torch.zeros(datapoints), noise))
+        return torch.utils.data.TensorDataset((xs.unsqueeze(-1) - self.x_mean ) / self.x_std, (ys.unsqueeze(-1) - self.y_mean) / self.y_std)
 
     def plot(self, name, eval_fn, gp_eval, variance, extra_range=0.01, plot_sigma=False, alpha=1, samples=100, plot_lml_trend=None, gp_lml=None):
         fig = plt.figure(figsize=(15, 6))
@@ -125,16 +121,23 @@ class RegressionToyDataset(torch.utils.data.Dataset):
             lml_ax.set_ylabel("LML", fontsize=14)
             lml_ax.plot(lml_sample_counts, lmls)
 
-
-
-    def plot_dataset(self, axis, extra_range=0.01):
-        extra = (self.max - self.min) * extra_range
-        min, max = self.min - extra, self.max + extra
+    def plot_dataset(self, min, max, axis, dataset=None):
         #plt.xlim(min, max)
-        t = torch.linspace(min, max, 50)
-        y = self.eval_value(t)
+        t = torch.linspace(min, max, 100)
+        y = self.eval(t, torch.zeros(100))
         axis.plot(t, y, color="blue")
-        axis.scatter(self.xs, self.ys, s=4, color="blue")
+        if dataset is None:
+            axis.scatter(self.xs, self.ys, s=4, color="blue")
+        else:
+            axis.scatter(dataset.tensors[0] * self.x_std + self.x_mean, dataset.tensors[1] * self.y_std + self.y_mean, s=4, color="blue")
+
+    def plot_predictions(self, min, max, eval_fn, samples, axis, dataset=None, alpha=1):
+        self.plot_dataset(min, max, axis, dataset)
+        t = torch.linspace(min, max, 100)
+        with torch.no_grad():
+            y = eval_fn((t.unsqueeze(-1) - self.x_mean) / self.x_std, samples) * self.y_std + self.y_mean
+        for sample in y:
+            axis.plot(t, sample[:,:,0], color="red", alpha=alpha)
 
 def calculate_lml_gaussian(target, samples, var):
     assert len(samples) > 0
@@ -142,14 +145,6 @@ def calculate_lml_gaussian(target, samples, var):
     for i, mean in enumerate(samples):
         log_likelihoods[i] = gauss_logprob(mean, var, target).sum()
     return -math.log(len(samples)) + torch.logsumexp(log_likelihoods, dim=0)
-
-def _sample_from_fn(function, min, max, sample_count, noise_sigma, skip=0):
-    lower_xs = ((min + max - skip) / 2 - min) * torch.rand(math.floor(sample_count / 2)) + min
-    higher_xs = (max - (min + max + skip) / 2) * torch.rand(math.ceil(sample_count / 2)) + (min + max + skip) / 2
-    xs = torch.cat((lower_xs, higher_xs))
-    noise = torch.normal(mean=torch.zeros(sample_count), std=torch.full((sample_count,), noise_sigma))
-    ys = function(xs, noise)
-    return xs.float(), ys.float()
 
 # See arXiv:1502.05336 (also used in arXiv:1612.01474)
 class CubicToyDataset(RegressionToyDataset):
@@ -161,11 +156,12 @@ class CubicToyDataset(RegressionToyDataset):
         return value**3 + self.offset + noise
 
 class TrigonometricToyDataset(RegressionToyDataset):
-    def __init__(self, min: float = 0, max: float = 0.5, sample_count: int = 20, normalize: bool = False, noise: float = 0.02, skip: float = 0):
-        super().__init__(min, max, sample_count, normalize, noise, skip)
+    def __init__(self, data_areas = [(0, 0.5, 100)], noise = 0.02):
+        super().__init__(data_areas, noise)
 
     def eval(self, value, noise):
-        return value + 0.3*torch.sin(2*torch.pi*(value + noise)) + 0.3*torch.sin(4*torch.pi*(value + noise)) + noise
+        #return value + 0.3*torch.sin(2*torch.pi*(value + noise)) + 0.3*torch.sin(4*torch.pi*(value + noise)) + noise
+        return value + 0.3*torch.sin(2*torch.pi*(value)) + 0.3*torch.sin(4*torch.pi*(value)) + noise
 
 eval_points = 100
 sample_cmap = ListedColormap(["red", "blue"])

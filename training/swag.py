@@ -48,7 +48,7 @@ class SwagModel(nn.Module):
         self.deviations = state["deviations"]
         self.param_dist_valid = False
 
-    def train(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
+    def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
         optimizer = optimizer_factory(self.model.parameters())
@@ -63,7 +63,7 @@ class SwagModel(nn.Module):
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.cpu()
-                self.swag_update(epoch, batch_idx)
+                self.swag_update(epoch, batch_idx, optimizer)
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
@@ -71,6 +71,7 @@ class SwagModel(nn.Module):
                 self.report_status()
         if report_every_epochs >= 0:
             print(f"Final loss {epoch_loss}")
+            self.report_status()
 
     def infer(self, input, samples):
         if samples <= 0:
@@ -101,7 +102,7 @@ class SwagModel(nn.Module):
             self.param_dist = torch.distributions.LowRankMultivariateNormal(self.mean, cov_factor, diag)
             self.param_dist_valid = True
 
-    def swag_update(self, epoch, batch_idx):
+    def swag_update(self, epoch, batch_idx, optimizer):
         if epoch >= self.start_epoch:
             self.batches_since_swag_start += 1
 
@@ -113,13 +114,11 @@ class SwagModel(nn.Module):
                 self.deviations = torch.roll(self.deviations, -1, 1)
                 self.deviations[:,-1] = params - self.weights
                 self.param_dist_valid = False
-                if self.use_lr_cycles:
-                    print(f"SWAG: Collected a sample at epoch {epoch}, batch {batch_idx}")
 
             if self.use_lr_cycles:
                 t = 1 - (self.batches_since_swag_start % self.update_every_batches) / self.update_every_batches
                 self.lr = t * (self.max_lr - self.min_lr) + self.min_lr
-                for g in self.optimizer.param_groups:
+                for g in optimizer.param_groups:
                     g["lr"] = self.lr
 
     def report_status(self):

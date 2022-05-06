@@ -18,7 +18,7 @@ class MonteCarloDropoutModule(nn.Module):
         self.model.load_state_dict(dict["model"])
         self.losses = dict["losses"]
 
-    def train(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
+    def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
         optimizer = optimizer_factory(self.model.parameters())
@@ -41,7 +41,7 @@ class MonteCarloDropoutModule(nn.Module):
             print(f"Final loss {epoch_loss}")
 
     def infer(self, input, samples):
-        self.model.train()  # Enable dropout
+        self.model.eval()
         return torch.stack([self.model(input) for _ in range(samples)])
 
     def all_losses(self):
