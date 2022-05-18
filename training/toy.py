@@ -163,93 +163,16 @@ class TrigonometricToyDataset(RegressionToyDataset):
         #return value + 0.3*torch.sin(2*torch.pi*(value + noise)) + 0.3*torch.sin(4*torch.pi*(value + noise)) + noise
         return value + 0.3*torch.sin(2*torch.pi*(value)) + 0.3*torch.sin(4*torch.pi*(value)) + noise
 
-eval_points = 100
-sample_cmap = ListedColormap(["red", "blue"])
-area_cmap = plt.cm.RdBu
-variance_cmap = plt.cm.viridis
-
-class ClassificationToyDataset(torch.utils.data.Dataset):
+class ClassificationToyDataset:
     def __init__(self, samples, labels):
         self.samples = samples
         self.labels = labels
 
-    def __iter__(self):
-        return zip(self.samples, self.labels)
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, key):
-        return self.samples[key], self.labels[key]
-
-    def plot_dataset(self, ax):
-        data, labels = zip(*self)
-        ax.scatter(*zip(*data), c=labels, cmap=sample_cmap, edgecolors="black")
-
-    def plot(self, name, eval_fn, samples, xlim, ylim):
-        with torch.no_grad():
-            fig, ((value_ax, var_ax), (rel_ax, _)) = plt.subplots(2, 2, figsize=(15, 10))
-            fig.suptitle(name)
-            value_ax.set_xlim(-xlim, xlim)
-            value_ax.set_ylim(-ylim, ylim)
-            var_ax.set_xlim(-xlim, xlim)
-            var_ax.set_ylim(-ylim, ylim)
-            
-            # Grid evaluation
-            xs, ys = np.meshgrid(np.linspace(-xlim, xlim, eval_points), np.linspace(-ylim, ylim, eval_points))
-            data = np.dstack((xs.reshape(eval_points * eval_points), ys.reshape(eval_points * eval_points)))[0]
-            results = torch.stack(eval_fn(torch.from_numpy(data).float(), samples)).reshape((samples, eval_points, eval_points))
-            value_ax.contourf(xs, ys, results.mean(dim=0), 100, cmap=area_cmap)
-            var_ax.contourf(xs, ys, results.var(dim=0), 100, cmap=variance_cmap, vmin=0, vmax=1.0)
-
-            # Training samples
-            results = torch.stack(eval_fn(self.samples, samples))
-            predictions = torch.round(torch.round(results).mean(dim=0))
-            confidences = (2 * torch.abs(results - 0.5)).mean(dim=0)
-            errors = predictions == self.labels
-            value_ax.scatter(*zip(*self.samples), facecolors=sample_cmap(predictions), edgecolors=sample_cmap(self.labels))
-
-            # Reliability diagram
-            bin_count = 10
-            bins = [[] for _ in range(bin_count)]
-            for i, confidence in enumerate(confidences):
-                bins[torch.floor(confidence * bin_count).int()].append(i)
-            bin_accuracys = np.array([errors[bin].sum() / len(bin) if len(bin) > 0 else 0 for bin in bins])
-            mid = np.linspace(0, 1 - 1 / bin_count, bin_count)
-            bin_errors = np.abs(np.array(bin_accuracys) - mid)
-            bin_confidences = np.array([confidences[bin].sum() / len(bin) if len(bin) > 0 else 0 for bin in bins])
-
-            rel_ax.set_xlim(0, 1)
-            rel_ax.set_ylim(0, 1)
-            rel_ax.grid(color="tab:grey", linestyle=(0, (1, 5)), linewidth=1)
-            interval = np.arange(0, 1, 1 / bin_count)
-            rel_ax.bar(interval, bin_accuracys, 1 / bin_count, align="edge", color="b", edgecolor="k")
-            rel_ax.bar(interval, bin_errors, 1 / bin_count, bottom=np.minimum(bin_accuracys, mid), align="edge", color="mistyrose", alpha=0.5, edgecolor="r", hatch="/")
-            rel_ax.set_ylabel('Accuracy',fontsize=16)
-            rel_ax.set_xlabel('Confidence',fontsize=16)
-
-            ece = np.mean(np.abs(bin_accuracys - bin_confidences))
-            mce = np.max(np.abs(bin_accuracys - bin_confidences))
-
-            ident = [0.0, 1.0]
-            rel_ax.plot(ident,ident,linestyle='--',color="tab:grey")
-
-            text = f"{samples} weight sample(s)\n" \
-                + f"Accuracy (majority vote): {errors.sum() / len(self.samples)} \n" \
-                + f"ECE: {ece} \n" \
-                + f"MCE: {mce}"
-            fig.text(0.5, 0.01, text, ha="center", va="top", fontsize=12)
+    def dataset(self):
+        return torch.utils.data.TensorDataset(self.samples, self.labels)
 
 class TwoMoonsDataset(ClassificationToyDataset):
-    def __init__(self, samples: int = 100, noise: float = 0.1, seed: int = None, extra_samples=0):
-        #all_data, all_labels = np.zeros((0, 2)), np.zeros((0))
-        #for x in range(2):
-        #    for y in range(2):
-        #        data, labels = sklearn.datasets.make_moons(samples, noise=noise, random_state=seed)
-        #        all_data = np.append(all_data, data + np.array([x * 4 - 2, y * 4 - 2]), axis=0)
-        #        all_labels = np.append(all_labels, labels, axis=0)
-        #super().__init__(torch.tensor(all_data, dtype=torch.float), torch.tensor(all_labels, dtype=torch.float).unsqueeze(-1))
-
+    def __init__(self, samples: int = 100, noise: float = 0.1, seed: int = 42, extra_samples=0):
         data, labels = sklearn.datasets.make_moons(samples, noise=noise, random_state=seed)
         if extra_samples > 0:
             data = np.append(data, np.array([np.array([3 * np.cos(t) + 2, 3 * np.sin(t)]) for t in np.linspace(np.pi, 1.15 * np.pi, extra_samples)]), axis=0)
