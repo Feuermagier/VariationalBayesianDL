@@ -18,6 +18,7 @@ class SwagModel(nn.Module):
         self.use_lr_cycles = config.get("use_lr_cycles", False)
         self.max_lr = config.get("max_lr", 0.005)
         self.min_lr = config.get("min_lr", 0.001)
+        self.use_low_rank_cov = config.get("use_low_rank_cov", True)
 
         self.weights = parameters_to_vector(self.model.parameters())
         self.sq_weights = self.weights**2
@@ -99,7 +100,10 @@ class SwagModel(nn.Module):
             diag = 0.5 * (torch.relu(self.sq_weights - self.weights**2) + 1e-6) # Adding 1e-6 for numerical stability
             cov_factor = self.deviations / math.sqrt(2 * (self.deviation_samples - 1))
             #self.param_dist = torch.distributions.MultivariateNormal(self.mean, cov_factor, diag)
-            self.param_dist = torch.distributions.LowRankMultivariateNormal(self.mean, cov_factor, diag)
+            if self.use_low_rank_cov:
+                self.param_dist = torch.distributions.LowRankMultivariateNormal(self.mean, cov_factor, diag)
+            else:
+                self.param_dist = torch.distributions.Normal(self.mean, torch.sqrt(2 * diag))
             self.param_dist_valid = True
 
     def swag_update(self, epoch, batch_idx, optimizer):

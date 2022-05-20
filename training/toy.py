@@ -121,7 +121,7 @@ class RegressionToyDataset:
             lml_ax.set_ylabel("LML", fontsize=14)
             lml_ax.plot(lml_sample_counts, lmls)
 
-    def plot_dataset(self, min, max, axis, dataset=None):
+    def plot_dataset(self, min, max, axis, dataset=None, zorder_offset=0):
         #plt.xlim(min, max)
         t = torch.linspace(min, max, 100)
         y = self.eval(t, torch.zeros(100))
@@ -129,7 +129,7 @@ class RegressionToyDataset:
         if dataset is None:
             axis.scatter(self.xs, self.ys, s=4, color="blue")
         else:
-            axis.scatter(dataset.tensors[0] * self.x_std + self.x_mean, dataset.tensors[1] * self.y_std + self.y_mean, s=4, color="blue")
+            axis.scatter(dataset.tensors[0] * self.x_std + self.x_mean, dataset.tensors[1] * self.y_std + self.y_mean, s=4, color="blue", zorder=1+zorder_offset)
 
     def plot_predictions(self, min, max, eval_fn, samples, axis, dataset=None, alpha=1):
         self.plot_dataset(min, max, axis, dataset)
@@ -137,7 +137,7 @@ class RegressionToyDataset:
         with torch.no_grad():
             y = eval_fn((t.unsqueeze(-1) - self.x_mean) / self.x_std, samples) * self.y_std + self.y_mean
         for sample in y:
-            axis.plot(t, sample[:,:,0], color="red", alpha=alpha)
+            axis.plot(t, sample[:,:,0], color="red", alpha=alpha, zorder=5 if alpha > 0.5 else 0)
 
 def calculate_lml_gaussian(target, samples, var):
     assert len(samples) > 0

@@ -63,6 +63,10 @@ class GaussWrapper(nn.Module):
     def all_losses(self):
         return self.mean.all_losses()
 
+    @property
+    def var(self):
+        return F.softplus(self.rho)
+
 def map_activation(name):
     if name == "relu":
         return nn.ReLU()

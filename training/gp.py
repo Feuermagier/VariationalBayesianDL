@@ -23,27 +23,40 @@ class GaussianProcess:
 
         self.likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=noise.expand(xs.shape[0]))
         #self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
-        self.gp = _GPModel(self.likelihood, self.xs, self.ys)
-        self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.gp)
 
-    def train_model(self, epochs, report_every_epochs=1):
-        self.gp.train()
+    def train_model(self, epochs, report_every_epochs=1, attempts=5):
         self.likelihood.train()
-        optimizer = torch.optim.Adam(self.gp.parameters(), lr=0.1)
 
-        losses = []
-        for epoch in range(epochs):
-            optimizer.zero_grad()
-            output = self.gp(self.xs)
-            loss = -self.mll(output, self.ys)
-            loss.backward()
-            optimizer.step()
-            losses.append(loss)
-            if report_every_epochs > 0 and epoch % report_every_epochs == 0:
-                print(f"Epoch {epoch}: loss {loss}")
-        if report_every_epochs >= 0:
-            print(f"Final loss {loss}")
-        self.losses = losses
+        best_loss = 100000
+        for i in range(attempts):
+            if report_every_epochs >= 0:
+                print(f"Training attempt {i}")
+
+            indices = torch.randperm(len(self.xs))
+
+            gp = _GPModel(self.likelihood, self.xs[indices], self.ys[indices])
+            gp.train()
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, gp)
+            optimizer = torch.optim.Adam(gp.parameters(), lr=0.1)
+
+            losses = []
+            for epoch in range(epochs):
+                optimizer.zero_grad()
+                output = gp(self.xs[indices])
+                loss = -mll(output, self.ys[indices])
+                loss.backward()
+                optimizer.step()
+                losses.append(loss)
+                if report_every_epochs > 0 and epoch % report_every_epochs == 0:
+                    print(f"Epoch {epoch}: loss {loss}")
+            if loss < best_loss:
+                best_loss = loss
+                self.gp = gp
+                self.mll = mll
+                self.losses = losses
+
+            if report_every_epochs >= 0:
+                print(f"Final loss {loss}")
 
     def infer(self, input, samples):
         self.gp.eval()

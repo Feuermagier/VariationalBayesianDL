@@ -1,4 +1,3 @@
-from multiprocessing import reduction
 import torch
 import numpy as np
 import sklearn.datasets
@@ -34,7 +33,7 @@ class RegressionResults:
                     mean_mse += F.mse_loss(means[i], target, reduction="sum") / means.shape[0]
                     log_likelihoods_per_sample[i] += gauss_logprob(means[i], vars[i], target).sum()
                 mse_of_means += F.mse_loss(mean, target, reduction="sum")
-                quantile_frequencies += calc_quantile_frequencies(outputs, target, cal_steps, fit_gaussian)
+                quantile_frequencies += calc_quantile_frequencies(means, vars, target, cal_steps, fit_gaussian)
 
         self.mean_mse = mean_mse / datapoints
         self.mse_of_means = mse_of_means / datapoints
@@ -44,27 +43,36 @@ class RegressionResults:
         self.quantile_ps = torch.linspace(0, 1, cal_steps)
         self.qce = (self.observed_cdf - self.quantile_ps).abs().mean()
 
-def calc_quantile_frequencies(outputs, targets, quantile_steps, fit_gaussian):
-    frequencies = torch.zeros(quantile_steps)
-    quantile_ps = torch.linspace(0, 1, quantile_steps)
-    samples = torch.distributions.Normal(outputs[:,:,:,0], outputs[:,:,:,1].sqrt()).sample()
+def calc_quantile_frequencies(means, vars, targets, quantile_steps, fit_gaussian):
+    quantile_ps = torch.linspace(0, 1, 2 * quantile_steps - 1)
+    samples = torch.distributions.Normal(means, vars.sqrt()).sample()
 
-    quantiles = torch.stack([torch.quantile(samples, p, dim=0) for p in quantile_ps])
+    quantiles = torch.stack([torch.quantile(samples, p, dim=0, keepdim=False, interpolation="nearest") for p in quantile_ps])
 
+    quantile_frequencies = torch.zeros(2 * quantile_steps + 1)
     for i, quantile in enumerate(quantiles):
-        frequencies[i] = (targets <= quantile).sum()
+        quantile_frequencies[i] = (targets <= quantile).sum()
+    quantile_frequencies /= len(targets)
+    
+    obs_confidences = torch.zeros(quantile_steps)
+    for i in range(quantile_steps):
+        obs_confidences[i] = quantile_frequencies[quantile_steps + i - 1] - quantile_frequencies[quantile_steps - i - 1]
 
-    return frequencies / len(targets)
+    return obs_confidences
 
-def plot_calibration(title, results, ax):
+def plot_calibration(title, results, ax, include_text=True):
     ax.set_xlabel("Expected Confidence Level", fontsize=14)
     ax.set_ylabel("Observed Confidence Level", fontsize=14)
     ax.plot([0, 1], [0,1])
     ax.plot(results.quantile_ps, results.observed_cdf, "o-")
-    text = f"{title}\nQCE: {results.qce:.3f}"
-    ax.text(0.08, 0.9, text, 
-        transform=ax.transAxes, fontsize=14, verticalalignment="top", 
-        bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
+    if include_text:
+        if title is not None:
+            text = f"{title}\nQCE: {results.qce:.3f}"
+        else:
+            text = f"QCE: {results.qce:.3f}"
+        ax.text(0.08, 0.9, text, 
+            transform=ax.transAxes, fontsize=14, verticalalignment="top", 
+            bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
 
 def plot_table(title, results, filename=None):
     average_lmls = torch.tensor([[res.average_lml for res in reses] for reses in results])

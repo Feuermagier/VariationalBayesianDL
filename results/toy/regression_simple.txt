@@ -1,8 +1,8 @@
 | Simple Toy Regression   | Avg LML    | Mean MSE    | MSE of Means   | QCE        |
 |-------------------------+------------+-------------+----------------+------------|
-| Gaussian Process        | 1.02 Â± nan | 0.001 Â± nan | 0.000 Â± nan    | 0.14 Â± nan |
-| MAP                     | 2.18 Â± nan | 0.001 Â± nan | 0.001 Â± nan    | 0.32 Â± nan |
-| Ensemble-5              | 2.40 Â± nan | 0.001 Â± nan | 0.001 Â± nan    | 0.30 Â± nan |
-| SWAG                    | 2.29 Â± nan | 0.002 Â± nan | 0.001 Â± nan    | 0.25 Â± nan |
-| MC Dropout              | 1.90 Â± nan | 0.003 Â± nan | 0.001 Â± nan    | 0.21 Â± nan |
-| Bayes By Backprop       | 2.10 Â± nan | 0.002 Â± nan | 0.001 Â± nan    | 0.24 Â± nan |
+| Gaussian Process        | 1.02 ± nan | 0.001 ± nan | 0.000 ± nan    | 0.14 ± nan |
+| MAP                     | 2.18 ± nan | 0.001 ± nan | 0.001 ± nan    | 0.32 ± nan |
+| Ensemble-5              | 2.40 ± nan | 0.001 ± nan | 0.001 ± nan    | 0.30 ± nan |
+| SWAG                    | 2.29 ± nan | 0.002 ± nan | 0.001 ± nan    | 0.25 ± nan |
+| MC Dropout              | 1.90 ± nan | 0.003 ± nan | 0.001 ± nan    | 0.21 ± nan |
+| Bayes By Backprop       | 2.10 ± nan | 0.002 ± nan | 0.001 ± nan    | 0.24 ± nan |
