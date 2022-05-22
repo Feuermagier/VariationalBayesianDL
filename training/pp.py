@@ -1,7 +1,6 @@
-from pickletools import optimize
 import torch
 import torch.nn as nn
-from .util import generate_model
+from .network import generate_model
 
 class PointPredictor(nn.Module):
     def __init__(self, layers):
@@ -42,6 +41,7 @@ class PointPredictor(nn.Module):
             print(f"Final loss {epoch_loss}")
 
     def infer(self, input, samples):
+        self.model.eval()
         return torch.stack([self.model(input) for _ in range(samples)])
 
     def all_losses(self):

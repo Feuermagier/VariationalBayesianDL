@@ -5,7 +5,7 @@ from torch.nn.utils.convert_parameters import parameters_to_vector, vector_to_pa
 import torch.nn.functional as F
 import math
 import numpy as np
-from .util import generate_model
+from .network import generate_model
 
 class SwagModel(nn.Module):
     def __init__(self, layers, config):

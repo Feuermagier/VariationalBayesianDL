@@ -46,7 +46,7 @@ class GaussianProcess:
                 loss = -mll(output, self.ys[indices])
                 loss.backward()
                 optimizer.step()
-                losses.append(loss)
+                losses.append(loss.detach())
                 if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                     print(f"Epoch {epoch}: loss {loss}")
             if loss < best_loss:

@@ -67,51 +67,6 @@ class GaussWrapper(nn.Module):
     def var(self):
         return F.softplus(self.rho)
 
-def map_activation(name):
-    if name == "relu":
-        return nn.ReLU()
-    elif name == "sigmoid":
-        return nn.Sigmoid()
-    elif name == "tanh":
-        return nn.Tanh()
-    elif name == "logsoftmax":
-        return nn.LogSoftmax(dim=1)
-    else:
-        raise ValueError(f"Unknown activation function {name}")
-
-def generate_model(architecture, scale=1, linear_fn=lambda i, o: nn.Linear(i, o), conv_fn=lambda i, o, k: nn.Conv2d(i, o, k), dropout_p=0, dropout_fn=lambda p: nn.Dropout(p), print_summary=False):
-    layers = []
-    for i, (ty, size) in enumerate(architecture):
-        if ty == "pool":
-            layers.append(nn.MaxPool2d(size))
-        elif ty == "flatten":
-            layers.append(nn.Flatten())
-        elif ty == "relu":
-            layers.append(nn.ReLU())
-        elif ty == "sigmoid":
-            layers.append(nn.Sigmoid())
-        elif ty == "logsoftmax":
-            layers.append(nn.LogSoftmax(dim=1))
-        elif ty == "fc":
-            (in_features, out_features) = size
-            in_features_scaled = in_features if i == 0 else int(in_features * scale)
-            out_features_scaled = out_features if i == len(architecture) - 1 else int(out_features * scale)
-            layers.append(linear_fn(int(in_features_scaled), int(out_features_scaled)))
-            if i < len(architecture) - 1 and dropout_p > 0:
-                layers.append(dropout_fn(dropout_p))
-        elif ty == "conv":
-            (in_channels, out_channels, kernel_size) = size
-            layers.append(conv_fn(in_channels, out_channels, kernel_size))
-        else:
-            raise ValueError(f"Unknown layer type '{ty}'")
-    model = nn.Sequential(*layers)
-
-    if print_summary:
-        print(f"Generated model: {model}")
-        print(f"{sum([p.numel() for p in model.parameters() if p.requires_grad])} trainable parameters")
-        
-    return model
-
 def plot_losses(name, losses, ax):
     epochs = max([len(loss) for loss in losses])
     ax.set_xlabel("Epoch", fontsize=14)
