@@ -52,7 +52,7 @@ class GaussWrapper(nn.Module):
             optimizer_factory_ext = optimizer_factory
         
         loss_fn = lambda output, target: F.gaussian_nll_loss(output, target, F.softplus(self.rho).repeat(output.shape[0]), reduction=loss_reduction)
-        self.mean.train_model(epochs, loss_fn, optimizer_factory_ext, *args, **kwargs)
+        return self.mean.train_model(epochs, loss_fn, optimizer_factory_ext, *args, **kwargs)
         
 
     def infer(self, input, samples):

@@ -101,6 +101,20 @@ class BBBLinear(nn.Module):
         else:
             raise ValueError("Invalid value of sampling")
 
+    def means(self):
+        return torch.cat([self.weight_mu.flatten(), self.bias_mu.flatten()])
+
+    def mean_grads(self):
+        return torch.cat([self.weight_mu.grad.flatten(),self.bias_mu.grad.flatten()])
+
+
+    def sigmas(self):
+        return torch.cat([to_sigma(self.weight_rho).flatten(), to_sigma(self.bias_rho).flatten()])
+
+    def rho_grads(self):
+        return torch.cat([self.weight_rho.grad.flatten(),self.bias_rho.grad.flatten()])
+
+
 class BBBConvolution(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int, weight_prior, bias_prior, **kwargs):
         super().__init__()
@@ -154,71 +168,70 @@ class BBBConvolution(nn.Module):
             raise ValueError("Invalid value of sampling")
 
 class LowRankBBBLinear(nn.Module):
-    def __init__(self, in_features: int, out_features: int, weight_prior, bias_prior, K, **kwargs):
+    def __init__(self, in_features: int, out_features: int, gamma, K, **kwargs):
         super().__init__()
         self.is_bayesian = True
-        self.sampling = kwargs.get("sampling", "activations")
-        self.mc_sample = kwargs.get("mc_sample", 1)
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
         self.in_features, self.out_features = in_features, out_features
-        self.weight_prior, self.bias_prior = weight_prior, bias_prior
-        self.init = kwargs.get("initialization", "foong")
+        self.gamma = gamma
         self.K = K
+        self.alpha = 1 / math.sqrt(self.K)
 
-        self.weight_mean = nn.Parameter(torch.empty((self.out_features, self.in_features)))
-        self.bias_mean = nn.Parameter(torch.empty((self.out_features,)))
-        self.param_diag_rho = nn.Parameter(torch.empty((self.out_features * self.in_features + self.out_features,)))
-        self.param_lr_vars = nn.Parameter(torch.empty((self.K, self.out_features * self.in_features + self.out_features)))
+        self.params = self.out_features * self.in_features + self.out_features
+        self.param_mean = nn.Parameter(torch.empty(self.params))
+        self.param_diag_rho = nn.Parameter(torch.empty(self.params))
+        self.param_lr_vars = nn.Parameter(torch.empty((self.K, self.params)))
         self.reset_parameters()
 
-        self.kl = 0
-
     def reset_parameters(self):
-        if self.init == "blundell":
-            torch.nn.init.normal_(self.weight_mean, 0, 0.1)
-            torch.nn.init.constant_(self.param_diag_rho, -3)
-            torch.nn.init.constant_(self.param_lr_vars, 1e-4)
-
-            torch.nn.init.normal_(self.bias_mean, 0, 0.1)
-        else:
-            raise ValueError(f"Unknown parameter init '{self.init}'")
+        torch.nn.init.normal_(self.param_mean, 0, 0.1)
+        torch.nn.init.constant_(self.param_diag_rho, -3)
+        torch.nn.init.constant_(self.param_lr_vars, 1e-4)
 
     def low_rank_forward(self, k, input, epsilon=None):
         if epsilon is None:
-            epsilon = torch.normal(input.shape)
-        weights = self.param_lr_vars[0:-self.out_features].reshape((self.out_features, self.in_features))
-        biases = self.param_lr_vars[-self.out_features:]
-        epsilon = torch.normal(0, input.shape[0]).expand((input.shape[0], self.out_features))
-        return F.linear(input, weights, biases) * epsilon
+            epsilon = torch.normal(torch.zeros(input.shape[0]), 1).unsqueeze(dim=-1).expand((input.shape[0], self.out_features))
+        weight, bias = self.convert_params(self.param_lr_vars[k])
+        return F.linear(input, weight, bias) * epsilon
+
+    def convert_params(self, params):
+        return params[:-self.out_features].reshape((self.out_features, self.in_features)), params[-self.out_features:].reshape((self.out_features,))
 
     def forward(self, input: torch.Tensor):
-        self.kl = 0
+        # Mean
+        weight_mean, bias_mean = self.convert_params(self.param_mean)
+        activation_mu = F.linear(input, weight_mean, bias_mean)
 
-        if self.sampling == "parameters":
-            raise NotImplementedError()
-        elif self.sampling == "activations":
-            activation_mu = F.linear(input, self.weight_mu, self.bias_mu)
-            activation_diag_var = F.linear(input**2, weight_sigma**2, bias_sigma**2)
-            activation_lr_vars = torch.stack([self.low_rank_forward(k, input) for k in range(self.K)])
-
-            if not self.training and self.freeze_on_eval:
-                epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(activation_mu.device)
-            else:
-                epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(activation_mu.device)
-                epsilon_k = torch.empty(activation_mu.shape).repeat(self.K, dim=0).normal_(0, 1).to(activation_mu.device)
-            output = activation_mu + torch.sqrt(activation_diag_var) * epsilon + 1 / math.sqrt(self.K) * torch.sum(activation_lr_vars, dim=1)
-            
-            if self.training or self.kl_on_eval:
-                #log_prior = self.weight_prior.log_prob(self.weight_mu).sum() + self.bias_prior.log_prob(self.bias_mu).sum() 
-                #self.kl = -log_prior
-                weight_kl = self.weight_prior.kl_divergence(self.weight_mu, weight_sigma)
-                bias_kl = self.bias_prior.kl_divergence(self.bias_mu, bias_sigma)
-                self.kl = weight_kl + bias_kl
-            
-            return output / self.mc_sample
+        # Diagonal
+        param_diag_var = to_sigma(self.param_diag_rho)
+        weight_diag_var, bias_diag_var = self.convert_params(param_diag_var)
+        if not self.training and self.freeze_on_eval:
+            epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(activation_mu.device)
         else:
-            raise ValueError("Invalid value of sampling")
+            epsilon = torch.empty(activation_mu.shape).normal_(0, 1).to(activation_mu.device)
+        activation_diag_var = torch.sqrt(F.linear(input**2, weight_diag_var**2, bias_diag_var**2)) * epsilon
+
+        # Low Rank
+        activation_lr_var = torch.stack([self.low_rank_forward(k, input) for k in range(self.K)]).sum(dim=0)
+
+        # Output
+        output = activation_mu + activation_diag_var + self.alpha * activation_lr_var
+        
+         
+        return output
+
+    @property
+    def kl(self):
+        param_diag_var = to_sigma(self.param_diag_rho)
+        capacitance = torch.eye(self.K) + self.param_lr_vars @ torch.diag(1 / param_diag_var) @ self.param_lr_vars.T
+        return 0.5 * (
+            (param_diag_var / self.gamma - torch.log(param_diag_var)).sum() \
+            + self.alpha / self.gamma * (torch.linalg.vector_norm(self.param_lr_vars, dim=1)**2).sum() \
+            - torch.log(torch.linalg.det(capacitance)) \
+            + 1 / self.gamma * torch.linalg.vector_norm(self.param_mean)**2 \
+            + self.params * (math.log(self.gamma) - 1)
+        )
 
 def to_sigma(rho):
     return F.softplus(rho)

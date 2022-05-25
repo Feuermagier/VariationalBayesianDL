@@ -31,29 +31,44 @@ class BBBModel(nn.Module):
         optimizer = optimizer_factory(self.model.parameters())
         pi = kl_rescaling / len(loader)
 
+        kl_grads = []
+        data_grads = []
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)
             for data, target in loader:
                 data, target = data.to(device), target.to(device)
                 optimizer.zero_grad()
 
-                loss = torch.tensor(0, dtype=torch.float)
+                kl_loss = torch.tensor(0, dtype=torch.float)
+                data_loss = torch.tensor(0, dtype=torch.float)
                 for _ in range(mc_samples):
                     output = self.model(data)
-                    kl = sum([getattr(layer, "kl", 0) for layer in self.model]) / data.shape[0]
-                    loss += (pi * kl + data_loss_fn(output, target)).cpu()
-                loss /= mc_samples
+                    kl_loss += sum([getattr(layer, "kl", 0) for layer in self.model]) / data.shape[0]
+                    data_loss += data_loss_fn(output, target)
 
-                loss.backward()
+                kl_loss /= mc_samples
+                kl_loss *= pi
+                data_loss /= mc_samples
+
+                kl_loss.backward(retain_graph=True)
+                kl_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
+                kl_grads.append(kl_grad)
+
+                data_loss.backward()
+                data_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
+                data_grad -= kl_grad
+                data_grads.append(data_grad)
+
                 #nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
                 optimizer.step()
-                epoch_loss += loss
+                epoch_loss += pi * kl_loss + data_loss
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")
         if report_every_epochs >= 0:
             print(f"Final loss {epoch_loss}")
+        return torch.stack(kl_grads), torch.stack(data_grads)
 
     def infer(self, input, samples):
         self.model.eval()
