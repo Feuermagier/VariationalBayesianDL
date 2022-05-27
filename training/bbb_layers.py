@@ -176,9 +176,9 @@ class LowRankBBBLinear(nn.Module):
         self.in_features, self.out_features = in_features, out_features
         self.gamma = gamma
         self.K = K
-        self.alpha = 1 / math.sqrt(self.K)
+        self.alpha = 1 / math.sqrt(self.K) if K != 0 else 1
 
-        self.params = self.out_features * self.in_features + self.out_features
+        self.params = (self.in_features + 1) * self.out_features
         self.param_mean = nn.Parameter(torch.empty(self.params))
         self.param_diag_rho = nn.Parameter(torch.empty(self.params))
         self.param_lr_vars = nn.Parameter(torch.empty((self.K, self.params)))
@@ -189,16 +189,41 @@ class LowRankBBBLinear(nn.Module):
         torch.nn.init.constant_(self.param_diag_rho, -3)
         torch.nn.init.constant_(self.param_lr_vars, 1e-4)
 
-    def low_rank_forward(self, k, input, epsilon=None):
-        if epsilon is None:
-            epsilon = torch.normal(torch.zeros(input.shape[0]), 1).unsqueeze(dim=-1).expand((input.shape[0], self.out_features))
-        weight, bias = self.convert_params(self.param_lr_vars[k])
-        return F.linear(input, weight, bias) * epsilon
-
-    def convert_params(self, params):
-        return params[:-self.out_features].reshape((self.out_features, self.in_features)), params[-self.out_features:].reshape((self.out_features,))
-
     def forward(self, input: torch.Tensor):
+        batch_size = input.shape[0]
+
+        # Add 1 as an additional value for each input and expand the tensor to K + 2
+        input_pad = torch.cat((input, torch.ones(batch_size, 1)), dim=-1)
+        input_ext = torch.cat((input_pad.repeat(self.K + 1, 1, 1), input_pad.unsqueeze(0)**2))
+
+        diag_vars = F.softplus(self.param_diag_rho).reshape(1, self.in_features + 1, self.out_features)**2
+        weight_means = self.param_mean.reshape(1, self.in_features + 1, self.out_features)
+        lr_vars = self.param_lr_vars.reshape(self.K, self.in_features + 1, self.out_features)
+        matrices = torch.cat((weight_means, lr_vars, diag_vars), dim=0)
+
+        # Batch matrix multiplication - handle diag separately to avoid repeat of input?
+        results = torch.bmm(input_ext, matrices)
+
+        # Undo batching
+        activation_mean = results[0]
+        activation_lr_std = results[1:-1]
+        activation_diag_std = torch.sqrt(results[-1])
+
+        # Perturb
+        if not self.training and self.freeze_on_eval:
+            epsilon_diag = torch.empty((1, self.out_features)).normal_(0, 1).expand((activation_mean.shape)).to(activation_mean.device)
+            epsilon_lr = torch.empty((self.K, 1, 1)).normal_(0, 1).expand((self.K, batch_size, self.out_features))
+        else:
+            epsilon_diag = torch.empty((batch_size, self.out_features)).normal_(0, 1).to(activation_mean.device)
+            epsilon_lr = torch.empty((self.K, batch_size, 1)).normal_(0, 1).expand((self.K, batch_size, self.out_features)).to(activation_mean.device)
+
+        activation_diag_std_p = activation_diag_std * epsilon_diag
+        activation_lr_std_p = activation_lr_std * epsilon_lr
+
+        output = activation_mean + activation_diag_std_p + self.alpha * activation_lr_std_p.sum(dim=0)
+
+        return output
+
         # Mean
         weight_mean, bias_mean = self.convert_params(self.param_mean)
         activation_mu = F.linear(input, weight_mean, bias_mean)
@@ -213,7 +238,11 @@ class LowRankBBBLinear(nn.Module):
         activation_diag_var = torch.sqrt(F.linear(input**2, weight_diag_var**2, bias_diag_var**2)) * epsilon
 
         # Low Rank
-        activation_lr_var = torch.stack([self.low_rank_forward(k, input) for k in range(self.K)]).sum(dim=0)
+        if not self.training and self.freeze_on_eval:
+            epsilon = torch.normal(torch.zeros(input.shape[0]), 1).unsqueeze(dim=-1).expand((input.shape[0], self.out_features))
+        else:
+            epsilon = None
+        activation_lr_var = torch.stack([self.low_rank_forward(k, input, epsilon=epsilon) for k in range(self.K)]).sum(dim=0) if self.K != 0 else torch.tensor(0)
 
         # Output
         output = activation_mu + activation_diag_var + self.alpha * activation_lr_var

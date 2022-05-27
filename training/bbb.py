@@ -51,13 +51,13 @@ class BBBModel(nn.Module):
                 data_loss /= mc_samples
 
                 kl_loss.backward(retain_graph=True)
-                kl_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
-                kl_grads.append(kl_grad)
+                #kl_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
+                #kl_grads.append(kl_grad)
 
                 data_loss.backward()
-                data_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
-                data_grad -= kl_grad
-                data_grads.append(data_grad)
+                #data_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
+                #data_grad -= kl_grad
+                #data_grads.append(data_grad)
 
                 #nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
                 optimizer.step()
@@ -68,7 +68,7 @@ class BBBModel(nn.Module):
                 print(f"Epoch {epoch}: loss {epoch_loss}")
         if report_every_epochs >= 0:
             print(f"Final loss {epoch_loss}")
-        return torch.stack(kl_grads), torch.stack(data_grads)
+        #return torch.stack(kl_grads), torch.stack(data_grads)
 
     def infer(self, input, samples):
         self.model.eval()
