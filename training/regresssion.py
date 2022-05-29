@@ -93,3 +93,6 @@ def plot_table(title, results, filename=None):
     if filename is not None:
         with open(filename, "w") as file:
             file.write(table)
+
+    plt.plot(average_lmls.mean(dim=1))
+    plt.xticks(torch.arange(1, len(results) + 1, 1))

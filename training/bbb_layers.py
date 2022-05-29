@@ -187,7 +187,7 @@ class LowRankBBBLinear(nn.Module):
     def reset_parameters(self):
         torch.nn.init.normal_(self.param_mean, 0, 0.1)
         torch.nn.init.constant_(self.param_diag_rho, -3)
-        torch.nn.init.constant_(self.param_lr_vars, 1e-4)
+        torch.nn.init.constant_(self.param_lr_vars, 0.005)
 
     def forward(self, input: torch.Tensor):
         batch_size = input.shape[0]
