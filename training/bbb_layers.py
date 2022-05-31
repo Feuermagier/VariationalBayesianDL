@@ -17,7 +17,8 @@ class BBBLinear(nn.Module):
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
         self.in_features, self.out_features = in_features, out_features
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
-        self.init = kwargs.get("initialization", "foong")
+        self.init = kwargs.get("initialization", "blundell")
+        self.rho_init = kwargs.get("rho_init", -3)
 
         self.weight_mu = nn.Parameter(torch.empty((self.out_features, self.in_features)))
         self.weight_rho = nn.Parameter(torch.empty((self.out_features, self.in_features)))
@@ -38,10 +39,10 @@ class BBBLinear(nn.Module):
             torch.nn.init.constant_(self.bias_rho, softplus_inverse(torch.tensor(1e-5)))
         elif self.init == "blundell":
             torch.nn.init.normal_(self.weight_mu, 0, 0.1)
-            torch.nn.init.constant_(self.weight_rho, -3)
+            torch.nn.init.constant_(self.weight_rho, self.rho_init)
 
             torch.nn.init.normal_(self.bias_mu, 0, 0.1)
-            torch.nn.init.constant_(self.bias_rho, -3)
+            torch.nn.init.constant_(self.bias_rho, self.rho_init)
         elif self.init == "wilson":
             # https://github.com/izmailovpavel/understandingbdl/blob/master/experiments/deep_ensembles/1d%20regression_svi.ipynb
             torch.nn.init.kaiming_uniform_(self.weight_mu, a=math.sqrt(5))
@@ -173,6 +174,8 @@ class LowRankBBBLinear(nn.Module):
         self.is_bayesian = True
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
+        self.rho_init = kwargs.get("rho_init", -3)
+        self.offdiag_init = kwargs.get("offdiag_init", 0.005)
         self.in_features, self.out_features = in_features, out_features
         self.gamma = gamma
         self.K = K
@@ -186,8 +189,8 @@ class LowRankBBBLinear(nn.Module):
 
     def reset_parameters(self):
         torch.nn.init.normal_(self.param_mean, 0, 0.1)
-        torch.nn.init.constant_(self.param_diag_rho, -3)
-        torch.nn.init.constant_(self.param_lr_vars, 0.005)
+        torch.nn.init.constant_(self.param_diag_rho, self.rho_init)
+        torch.nn.init.constant_(self.param_lr_vars, self.offdiag_init)
 
     def forward(self, input: torch.Tensor):
         batch_size = input.shape[0]

@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from scipy.stats import wasserstein_distance
 import math
 from .util import gauss_logprob
+from .regresssion import denormalize_outputs, normalize, denormalize
 
 class RegressionToyDataset:
     # data_areas = [(min, max, datapoints)]; must be sorted
@@ -36,8 +37,8 @@ class RegressionToyDataset:
         # self.y_mean = 0
         # self.y_std = 1
 
-        self.normalized_xs = (xs - self.x_mean) / self.x_std
-        self.normalized_ys = (ys - self.y_mean) / self.y_std
+        self.normalized_xs = normalize(self.xs, self.x_mean, self.x_std)
+        self.normalized_ys = normalize(self.ys, self.y_mean, self.y_std)
 
         self.trainset = torch.utils.data.TensorDataset(self.normalized_xs, self.normalized_ys)
 
@@ -121,23 +122,30 @@ class RegressionToyDataset:
             lml_ax.set_ylabel("LML", fontsize=14)
             lml_ax.plot(lml_sample_counts, lmls)
 
-    def plot_dataset(self, min, max, axis, dataset=None, zorder_offset=0):
+    def plot_dataset(self, min, max, axis, dataset=None, plot_ground_truth=True):
         #plt.xlim(min, max)
-        t = torch.linspace(min, max, 100)
-        y = self.eval(t, torch.zeros(100))
-        axis.plot(t, y, color="blue")
+        if plot_ground_truth:
+            t = torch.linspace(min, max, 100)
+            y = self.eval(t, torch.zeros(100))
+            axis.plot(t, y, color="blue", zorder=2)
         if dataset is None:
-            axis.scatter(self.xs, self.ys, s=4, color="blue")
+            axis.scatter(self.xs, self.ys, s=4, color="blue", zorder=3)
         else:
-            axis.scatter(dataset.tensors[0] * self.x_std + self.x_mean, dataset.tensors[1] * self.y_std + self.y_mean, s=4, color="blue", zorder=1+zorder_offset)
+            axis.scatter(denormalize(dataset.tensors[0], self.x_mean, self.x_std), denormalize(dataset.tensors[1], self.y_mean, self.y_std), s=4, color="blue", zorder=3)
 
-    def plot_predictions(self, min, max, eval_fn, samples, axis, dataset=None, alpha=1):
-        self.plot_dataset(min, max, axis, dataset)
+    def plot_predictions(self, min, max, eval_fn, samples, axis, dataset=None, alpha=1, plot_ground_truth=True, plot_confidence_intervals=True, plot_mean=True):
+        self.plot_dataset(min, max, axis, dataset=dataset, plot_ground_truth=plot_ground_truth)
         t = torch.linspace(min, max, 100)
         with torch.no_grad():
-            y = eval_fn((t.unsqueeze(-1) - self.x_mean) / self.x_std, samples) * self.y_std + self.y_mean
-        for sample in y:
-            axis.plot(t, sample[:,:,0], color="red", alpha=alpha, zorder=5 if alpha > 0.5 else 0)
+            y = eval_fn(normalize(t.unsqueeze(-1), self.x_mean, self.x_std), samples)
+            means, stds = denormalize_outputs(y, self.y_mean, self.y_std)
+        for (mean, std) in zip(means, stds):
+            if plot_confidence_intervals:
+                lower = (mean - 3 * std).squeeze(-1)
+                upper = (mean + 3 * std).squeeze(-1)
+                axis.fill_between(t, lower, upper, color="red", alpha=0.3*alpha, zorder=5 if alpha > 0.5 else 0)
+            if plot_mean:
+                axis.plot(t, mean, color="red", alpha=alpha, zorder=6 if alpha > 0.5 else 1)
 
 def calculate_lml_gaussian(target, samples, var):
     assert len(samples) > 0

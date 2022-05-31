@@ -31,8 +31,8 @@ class BBBModel(nn.Module):
         optimizer = optimizer_factory(self.model.parameters())
         pi = kl_rescaling / len(loader)
 
-        kl_grads = []
-        data_grads = []
+        # kl_grads = []
+        # data_grads = []
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)
             for data, target in loader:

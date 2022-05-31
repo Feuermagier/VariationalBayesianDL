@@ -10,7 +10,7 @@ from tabulate import tabulate
 from .util import gauss_logprob
 
 class RegressionResults:
-    def __init__(self, testloader, name, eval_fn, samples, device, fit_gaussian=True, cal_steps=10, target_mean=0, target_std=1):
+    def __init__(self, testloader, name, eval_fn, samples, device, cal_steps=10, target_mean=0, target_std=1):
         self.name = name
 
         mean_mse = 0
@@ -25,15 +25,14 @@ class RegressionResults:
                 torch.manual_seed(0) # Hoping that this produces deterministic outputs for correct LML calculation
                 outputs = eval_fn(data, samples).cpu()
                 # outputs = [samples,batch_size,out_dim,2 = mean + var]
-                means = outputs[:,:,:,0] * target_std + target_mean
-                vars = outputs[:,:,:,1] * target_std**2
+                means, stds = denormalize_outputs(outputs, target_mean, target_std)
                 mean = means.mean(dim=0)
                 target = target * target_std + target_mean
                 for i in range(len(outputs)):
                     mean_mse += F.mse_loss(means[i], target, reduction="sum") / means.shape[0]
-                    log_likelihoods_per_sample[i] += gauss_logprob(means[i], vars[i], target).sum()
+                    log_likelihoods_per_sample[i] += gauss_logprob(means[i], stds[i]**2, target).sum()
                 mse_of_means += F.mse_loss(mean, target, reduction="sum")
-                quantile_frequencies += calc_quantile_frequencies(means, vars, target, cal_steps, fit_gaussian)
+                quantile_frequencies += calc_quantile_frequencies(means, stds, target, cal_steps)
 
         self.mean_mse = mean_mse / datapoints
         self.mse_of_means = mse_of_means / datapoints
@@ -43,9 +42,9 @@ class RegressionResults:
         self.quantile_ps = torch.linspace(0, 1, cal_steps)
         self.qce = (self.observed_cdf - self.quantile_ps).abs().mean()
 
-def calc_quantile_frequencies(means, vars, targets, quantile_steps, fit_gaussian):
+def calc_quantile_frequencies(means, stds, targets, quantile_steps):
     quantile_ps = torch.linspace(0, 1, 2 * quantile_steps - 1)
-    samples = torch.distributions.Normal(means, vars.sqrt()).sample()
+    samples = torch.distributions.Normal(means, stds).sample()
 
     quantiles = torch.stack([torch.quantile(samples, p, dim=0, keepdim=False, interpolation="nearest") for p in quantile_ps])
 
@@ -63,8 +62,10 @@ def calc_quantile_frequencies(means, vars, targets, quantile_steps, fit_gaussian
 def plot_calibration(title, results, ax, include_text=True):
     ax.set_xlabel("Expected Confidence Level", fontsize=14)
     ax.set_ylabel("Observed Confidence Level", fontsize=14)
-    ax.plot([0, 1], [0,1])
-    ax.plot(results.quantile_ps, results.observed_cdf, "o-")
+    ax.plot([0, 1], [0,1], color="royalblue")
+    ax.plot(results.quantile_ps, results.observed_cdf, "o-", color="darkorange")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     if include_text:
         if title is not None:
             text = f"{title}\nQCE: {results.qce:.3f}"
@@ -96,3 +97,12 @@ def plot_table(title, results, filename=None):
 
     plt.plot(average_lmls.mean(dim=1))
     plt.xticks(torch.arange(1, len(results) + 1, 1))
+
+def normalize(x, data_mean, data_std):
+    return (x - data_mean) / data_std
+
+def denormalize(y, target_mean, target_std):
+    return y * target_std + target_mean
+
+def denormalize_outputs(outputs, target_mean, target_std):
+    return outputs[:,:,:,0] * target_std + target_mean, outputs[:,:,:,1] * target_std

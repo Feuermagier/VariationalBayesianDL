@@ -29,10 +29,10 @@ class GaussianMixture:
         return torch.logaddexp(self.log_pi + self.gaussian1.log_prob(value), self.log_pi + self.gaussian2.log_prob(value))
 
 class GaussWrapper(nn.Module):
-    def __init__(self, mean, var_init: torch.Tensor, learn_var: bool = False):
+    def __init__(self, mean, std_init: torch.Tensor, learn_var: bool = False):
         super().__init__()
         self.mean = mean
-        self.rho = torch.log(torch.exp(var_init) - 1).unsqueeze(0)
+        self.rho = torch.log(torch.exp(std_init) - 1)
         if learn_var:
             self.rho = nn.Parameter(self.rho)
         self.learn_var = learn_var

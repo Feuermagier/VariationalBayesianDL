@@ -13,7 +13,7 @@ def calculate_mce(bin_count, errors, confidences):
     bins = _create_static_bins(bin_count, confidences)
     return _max_calibration_error(bins, errors, confidences)
 
-def reliability_diagram(bin_count, errors, confidences, ax, include_accuracy=True, include_ace=True, include_mce=False):
+def reliability_diagram(bin_count, errors, confidences, ax, include_accuracy=True, include_ace=True, include_mce=False, include_ece=True, include_bin_sizes=True):
     assert len(errors) == len(confidences)
     
     static_bins = _create_static_bins(bin_count, confidences)
@@ -31,14 +31,18 @@ def reliability_diagram(bin_count, errors, confidences, ax, include_accuracy=Tru
     ax.set_ylabel('Accuracy', fontsize=14)
     ax.set_xlabel('Confidence', fontsize=14)
 
-    for (x, count) in zip(interval, static_bins):
-        ax.text(x + 0.5 * 1 / bin_count, 0.01, str(len(count)), color="white", fontsize=14, ha="center")
+    if include_bin_sizes:
+        for (x, count) in zip(interval, static_bins):
+            ax.text(x + 0.5 * 1 / bin_count, 0.01, str(len(count)), color="white", fontsize=14, ha="center")
 
     ident = [0.0, 1.0]
     ax.plot(ident,ident,linestyle='--',color="tab:grey")
 
     ece = _mean_calibration_error(static_bins, errors, confidences)
-    text = f"ECE: {ece:.3f}"
+    text = ""
+
+    if include_ece:
+        text += f"ECE: {ece:.3f}"
 
     if include_mce:
         mce = _max_calibration_error(static_bins, errors, confidences)
@@ -52,9 +56,10 @@ def reliability_diagram(bin_count, errors, confidences, ax, include_accuracy=Tru
         acc = errors.sum() / len(errors)
         text += f"\nAcc: {acc:.3f}"
 
-    ax.text(0.08, 0.9, text, 
-        transform=ax.transAxes, fontsize=16, verticalalignment="top", 
-        bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
+    if text != "":
+        ax.text(0.08, 0.9, text, 
+            transform=ax.transAxes, fontsize=16, verticalalignment="top", 
+            bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
 
 def _create_static_bins(bin_count, confidences):
     bins = [[] for _ in range(bin_count)]

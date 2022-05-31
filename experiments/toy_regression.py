@@ -9,18 +9,19 @@ from training.regresssion import RegressionResults, plot_calibration
 
 NOISE = torch.tensor(0.02)
 
-def wrap(model):
-    return util.GaussWrapper(model, NOISE, False)
+def wrap(model, dataset):
+    return util.GaussWrapper(model, NOISE / dataset.y_std, False)
 
-def plot_grid(dataset, testset, models, device, min=-0.3, max=0.8):
+def plot_grid(dataset, testset, models, device, min=-0.3, max=0.8, plot_ground_truth=True):
     fig, axes = plt.subplots(nrows=4, ncols=len(models), figsize=(5 * len(models), 15), squeeze=False)
     testloader = torch.utils.data.DataLoader(testset, batch_size=testset.tensors[0].shape[0])
     results = []
     for i, (name, model, samples) in enumerate(models):
         util.plot_losses(name, model.all_losses(), axes[0, i])
-        result = RegressionResults(testloader, name, model.infer, samples, device, fit_gaussian=False, target_mean=dataset.y_mean, target_std = dataset.y_std)
-        dataset.plot_predictions(min, max, model.infer, samples, axes[1, i], dataset=None, alpha = 0.1 if samples > 10 else 1)
-        dataset.plot_predictions(min, max, model.infer, samples, axes[2, i], dataset=testset, alpha = 0.1 if samples > 10 else 1)
+        result = RegressionResults(testloader, name, model.infer, 1000, device, target_mean=dataset.y_mean, target_std = dataset.y_std)
+        axes[1, i].set_xlim(-1.6, 1.3)
+        dataset.plot_predictions(min, max, model.infer, samples, axes[1, i], dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
+        dataset.plot_predictions(min, max, model.infer, samples, axes[2, i], dataset=testset, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
         plot_calibration(name, result, axes[3, i])
         results.append(result)
         print(f"Test LML ({name}): {result.average_lml}")
@@ -35,12 +36,12 @@ def gap_datasets(device):
 
     return dataset, trainloader, testset
 
-def store_results(dataset, testset, models, device, min=-0.3, max=0.8):
+def store_results(dataset, testset, models, device, min=-0.3, max=0.8, plot_ground_truth=False):
     testloader = torch.utils.data.DataLoader(testset, batch_size=testset.tensors[0].shape[0])
     for i, (name, model, samples) in enumerate(models):
-        result = RegressionResults(testloader, name, model.infer, samples, device, fit_gaussian=False, target_mean=dataset.y_mean, target_std = dataset.y_std)
+        result = RegressionResults(testloader, name, model.infer, samples, device, target_mean=dataset.y_mean, target_std = dataset.y_std)
         fig, ax = plt.subplots(1, 1)
-        dataset.plot_predictions(min, max, model.infer, samples, ax, dataset=None, alpha = 0.1 if samples > 10 else 1)
+        dataset.plot_predictions(min, max, model.infer, samples, ax, dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
         fig.tight_layout(pad=0)
         fig.savefig(f"results/toy/regression/{name}_plot.pdf")
 

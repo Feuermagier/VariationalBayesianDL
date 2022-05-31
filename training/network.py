@@ -37,11 +37,11 @@ def generate_model(architecture, print_summary=False):
             (in_features, out_features) = size
             layers.append(nn.Linear(in_features, out_features))
         elif ty == "v_fc":
-            (in_features, out_features, prior) = size
-            layers.append(BBBLinear(in_features, out_features, prior, prior, initialization="blundell"))
+            (in_features, out_features, prior, args) = size
+            layers.append(BBBLinear(in_features, out_features, prior, prior, **args))
         elif ty == "vlr_fc":
-            (in_features, out_features, K, gamma) = size
-            layers.append(LowRankBBBLinear(in_features, out_features, gamma, K))
+            (in_features, out_features, K, gamma, args) = size
+            layers.append(LowRankBBBLinear(in_features, out_features, gamma, K, **args))
         elif ty == "conv":
             (in_channels, out_channels, kernel_size) = size
             layers.append(nn.Conv2d(in_channels, out_channels, kernel_size))
