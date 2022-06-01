@@ -10,14 +10,15 @@ from training import util
 from training.calibration import reliability_diagram
 
 
-def eval_model(name, eval_fn, losses, samples, testloader, device, include_ace=True):
+def eval_model(name, model, samples, testloader, device, path, log):
     torch.manual_seed(42)
-    # Test performance
+
+    # Evaluate
     errors = []
     confidences = []
     with torch.no_grad():
         for data, target in testloader:
-            output = eval_fn(data.to(device), samples).mean(dim=0).cpu()
+            output = model.infer(data.to(device), samples).mean(dim=0).cpu()
             preds = torch.argmax(output, dim=1)
             errors.append(preds == target)
             confidences.append(output[torch.arange(output.shape[0]), preds].exp())
@@ -33,23 +34,21 @@ def eval_model(name, eval_fn, losses, samples, testloader, device, include_ace=T
     confidences = torch.cat(confidences)
     accuracy = errors.sum() / len(errors)
 
-    fig = plt.figure(figsize=(12, 5))
+    # Plot loss
+    fig, ax = plt.subplots()
+    util.plot_losses(name, model.all_losses(), ax)
     fig.set_tight_layout(True)
-    fig.suptitle(name + f" (Test Accuracy {accuracy:.3f})", fontsize=16)
+    fig.savefig(path + "loss.pdf")
 
-    # Plot loss over time
-    max_epochs = max([len(l) for l in losses])
-    loss_ax = fig.add_subplot(1, 2, 1)
-    loss_ax.set_xlabel("Epoch", fontsize=14)
-    loss_ax.set_xticks(np.arange(1, max_epochs + 1, 1))
-    loss_ax.set_ylabel("Training NLL Loss", fontsize=14)
-    for single_losses in losses:
-        loss_ax.plot(np.arange(1, max_epochs + 1, 1), single_losses)
+    # Plot calibration
+    fig, ax = plt.subplots()
+    ece = reliability_diagram(10, errors, confidences, ax, include_accuracy=False, include_ace=False)
+    fig.set_tight_layout(True)
+    fig.savefig(path + "reliability.pdf")
 
-    rel_ax = fig.add_subplot(1, 2, 2)
-    reliability_diagram(10, errors, confidences, rel_ax, include_ace)
-
-    return fig
+    # Print results
+    log.info(f"Accuracy: {accuracy}")
+    log.info(f"ECE: {ece}")
 
 # models = [(name, eval_fn, loss_over_time, [ece_over_time per dataset in the same order], eval_samples)]
 # datasets = [(name, dataloader)]
