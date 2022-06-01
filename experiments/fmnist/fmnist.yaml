@@ -1,14 +1,16 @@
 ---
 # Slurm config
 name: "SLURM"
-partition: "single"
+partition: "gpu_4"
 job-name: "bdl-fmnist"
-num_parallel_jobs: 120
+num_parallel_jobs: 1
 ntasks: 1
 cpus-per-task: 1
 cpu-per-task: 2
 mem-per-cpu: 1000
-time: 10
+time: 20
+sbatch_args:
+  gres: "gpu:1"
 
 ---
 name: "DEFAULT"
