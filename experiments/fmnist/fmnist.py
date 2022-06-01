@@ -153,10 +153,10 @@ def run_mc_dropout(device, trainloader, config, model_out_path):
         ("pool", 2),
         ("flatten", ()),
         ("fc", (16 * 4 * 4, 120)),
-        ("dropout", (p,))
+        ("dropout", (p,)),
         ("relu", ()),
         ("fc", (120, 84)),
-        ("dropout", (p,))
+        ("dropout", (p,)),
         ("relu", ()),
         ("fc", (84, 10)),
         ("logsoftmax", ())
@@ -179,10 +179,10 @@ def run_multi_mc_dropout(device, trainloader, config, model_out_path):
         ("pool", 2),
         ("flatten", ()),
         ("fc", (16 * 4 * 4, 120)),
-        ("dropout", (p,))
+        ("dropout", (p,)),
         ("relu", ()),
         ("fc", (120, 84)),
-        ("dropout", (p,))
+        ("dropout", (p,)),
         ("relu", ()),
         ("fc", (84, 10)),
         ("logsoftmax", ())
