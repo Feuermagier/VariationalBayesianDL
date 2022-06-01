@@ -85,7 +85,7 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
                     output = eval_fn(data.to(device), eval_samples).mean(dim=0).cpu()
                     preds = torch.argmax(output, dim=1)
                     errors.append(preds == target)
-                    confidences.append(output[torch.arange(output.shape[0]), preds].exp())
+                    confidences.append(output[torch.arange(output.shape[0]), preds].exp() - 1 / output.shape[-1])
                     # outputs = eval_fn(data.to(device), eval_samples).cpu()
                     # sample_preds = torch.transpose(
                     #     torch.argmax(outputs, dim=2), 0, 1)

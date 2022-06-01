@@ -204,7 +204,7 @@ class LowRankBBBLinear(nn.Module):
         lr_vars = self.param_lr_vars.reshape(self.K, self.in_features + 1, self.out_features)
         matrices = torch.cat((weight_means, lr_vars, diag_vars), dim=0)
 
-        # Batch matrix multiplication - handle diag separately to avoid repeat of input?
+        # Batch matrix multiplication - handle diag separately to avoid repeating the input?
         results = torch.bmm(input_ext, matrices)
 
         # Undo batching

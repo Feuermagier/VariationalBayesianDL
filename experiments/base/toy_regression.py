@@ -19,7 +19,8 @@ def plot_grid(dataset, testset, models, device, min=-0.3, max=0.8, plot_ground_t
     for i, (name, model, samples) in enumerate(models):
         util.plot_losses(name, model.all_losses(), axes[0, i])
         result = RegressionResults(testloader, name, model.infer, 1000, device, target_mean=dataset.y_mean, target_std = dataset.y_std)
-        axes[1, i].set_xlim(-1.6, 1.3)
+        axes[1, i].set_ylim(-0.9, 1.3)
+        axes[2, i].set_ylim(-0.9, 1.3)
         dataset.plot_predictions(min, max, model.infer, samples, axes[1, i], dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
         dataset.plot_predictions(min, max, model.infer, samples, axes[2, i], dataset=testset, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
         plot_calibration(name, result, axes[3, i])
@@ -41,6 +42,7 @@ def store_results(dataset, testset, models, device, min=-0.3, max=0.8, plot_grou
     for i, (name, model, samples) in enumerate(models):
         result = RegressionResults(testloader, name, model.infer, samples, device, target_mean=dataset.y_mean, target_std = dataset.y_std)
         fig, ax = plt.subplots(1, 1)
+        ax.set_ylim(-0.9, 1.3)
         dataset.plot_predictions(min, max, model.infer, samples, ax, dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
         fig.tight_layout(pad=0)
         fig.savefig(f"results/toy/regression/{name}_plot.pdf")

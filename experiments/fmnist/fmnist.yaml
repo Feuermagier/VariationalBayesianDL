@@ -1,0 +1,30 @@
+---
+# Slurm config
+name: "SLURM"
+partition: "dev"
+job-name: "bdl-fmnist"
+num_parallel_jobs: 120
+ntasks: 1
+cpus-per-task: 1
+mem-per-cpu: 1000
+time: 30
+
+---
+name: "DEFAULT"
+path: "results"
+repetitions: 1
+reps_per_job: 1
+reps_in_parallel: 1
+
+params:
+  batch_size: 20
+  data_path: "../../data/"
+
+
+---
+name: "MAP"
+
+params:
+  model: "map"
+  lr: 0.1
+  epochs: 10
