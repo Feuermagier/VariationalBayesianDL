@@ -27,4 +27,4 @@ name: "MAP"
 params:
   model: "map"
   lr: 0.1
-  epochs: 10
+  epochs: 15

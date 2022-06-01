@@ -7,7 +7,7 @@ from cw2 import experiment, cw_error, cluster_work
 from cw2.cw_data import cw_logging
 
 from experiments.base import mnist
-from training.util import adam
+from training.util import sgd
 from training.pp import PointPredictor
 
 def run(device, config, out_path):
@@ -40,7 +40,7 @@ def run_map(device, trainloader, config, model_out_path):
     ]
 
     map = PointPredictor(layers)
-    map.train_model(config["epochs"], torch.nn.NLLLoss(), adam(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    map.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     torch.save(map.state_dict(), model_out_path + "map.tar")
 
 
@@ -51,6 +51,7 @@ class FashionMNISTExperiment(experiment.AbstractExperiment):
 
     def run(self, config: dict, rep: int, logger: cw_logging.LoggerArray) -> None:
         l = cw_logging.getLogger()
+        l.info(config["params"])
         if torch.cuda.is_available():
             l.info("Using the GPU")
             device = torch.device("cuda")

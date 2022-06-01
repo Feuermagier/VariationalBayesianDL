@@ -21,7 +21,7 @@ def plot_grid(dataset, testset, models, device, min=-0.3, max=0.8, plot_ground_t
         result = RegressionResults(testloader, name, model.infer, 1000, device, target_mean=dataset.y_mean, target_std = dataset.y_std)
         axes[1, i].set_ylim(-0.9, 1.3)
         axes[2, i].set_ylim(-0.9, 1.3)
-        dataset.plot_predictions(min, max, model.infer, samples, axes[1, i], dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
+        dataset.plot_predictions(min, max, model.infer, samples, axes[1, i], dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth, plot_confidence_intervals=False)
         dataset.plot_predictions(min, max, model.infer, samples, axes[2, i], dataset=testset, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
         plot_calibration(name, result, axes[3, i])
         results.append(result)
