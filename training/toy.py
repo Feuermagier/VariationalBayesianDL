@@ -28,10 +28,10 @@ class RegressionToyDataset:
         self.xs, self.ys = xs[permutation], ys[permutation]
 
         # Normalize
-        self.x_mean = torch.mean(self.xs, dim=0)
-        self.x_std = torch.std(self.xs, dim=0)
-        self.y_mean = torch.mean(self.ys, dim=0)
-        self.y_std = torch.std(self.ys, dim=0)
+        self.x_mean = torch.mean(self.xs, dim=0).squeeze(-1)
+        self.x_std = torch.std(self.xs, dim=0).squeeze(-1)
+        self.y_mean = torch.mean(self.ys, dim=0).squeeze(-1)
+        self.y_std = torch.std(self.ys, dim=0).squeeze(-1)
         # self.x_mean = 0
         # self.x_std = 1
         # self.y_mean = 0
@@ -39,6 +39,7 @@ class RegressionToyDataset:
 
         self.normalized_xs = normalize(self.xs, self.x_mean, self.x_std)
         self.normalized_ys = normalize(self.ys, self.y_mean, self.y_std)
+        self.normalized_noise = noise / self.y_std
 
         self.trainset = torch.utils.data.TensorDataset(self.normalized_xs, self.normalized_ys)
 

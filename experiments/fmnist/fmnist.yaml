@@ -8,14 +8,14 @@ ntasks: 1
 cpus-per-task: 1
 cpu-per-task: 2
 mem-per-cpu: 1000
-time: 20
+time: 30
 sbatch_args:
   gres: "gpu:1"
 
 ---
 name: "DEFAULT"
 path: "results"
-repetitions: 10
+repetitions: 1
 reps_per_job: 1
 reps_in_parallel: 1
 
@@ -23,6 +23,7 @@ params:
   batch_size: 20
   data_path: "../../data/"
   eval: "corrupted"
+  eval_samples: 100
 
 ---
 name: "MAP"

@@ -14,9 +14,9 @@ class RMSModule(nn.Module):
         self.anchor = [torch.normal(torch.zeros_like(params), gamma) for params in self.model.parameters()]
         self.infer_with_anchor = False
 
-    def state_dict(self):
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
-            "model": self.model.state_dict(),
+            "model": self.model.state_dict(destination, prefix, keep_vars),
             "anchor": self.anchor,
             "losses": self.losses
         }

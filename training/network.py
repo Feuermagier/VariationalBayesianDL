@@ -5,6 +5,7 @@ import math
 import numpy as np
 import itertools
 
+from training.util import GaussLayer
 from training.bbb_layers import BBBLinear, LowRankBBBLinear
 from training.dropout import FixableDropout
 
@@ -48,6 +49,9 @@ def generate_model(architecture, print_summary=False):
         elif ty == "dropout":
             p, = size
             layers.append(FixableDropout(p))
+        elif ty == "gauss":
+            std, learn_std = size
+            layers.append(GaussLayer(std, learn_std))
         else:
             raise ValueError(f"Unknown layer type '{ty}'")
     model = nn.Sequential(*layers)

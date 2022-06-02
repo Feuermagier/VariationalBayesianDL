@@ -15,6 +15,11 @@ def sgd(lr):
 def adam(lr):
     return lambda parameters: torch.optim.Adam(parameters, lr=lr)
 
+def nll_loss(output, target, reduction="mean"):
+    mean = output[...,0]
+    std = output[...,1]
+    return F.gaussian_nll_loss(mean, target, std**2, reduction)
+
 # Weighted sum of two gaussian distributions
 class GaussianMixture:
     def __init__(self, pi, sigma1, sigma2):
@@ -28,50 +33,75 @@ class GaussianMixture:
         #return torch.log((self.pi * p1 + (1 - self.pi) * p2)).sum()
         return torch.logaddexp(self.log_pi + self.gaussian1.log_prob(value), self.log_pi + self.gaussian2.log_prob(value))
 
-class GaussWrapper(nn.Module):
-    def __init__(self, mean, std_init: torch.Tensor, learn_var: bool = False):
+# class GaussWrapper(nn.Module):
+#     def __init__(self, mean, std_init: torch.Tensor, learn_var: bool = False):
+#         super().__init__()
+#         self.mean = mean
+#         self.rho = torch.log(torch.exp(std_init) - 1)
+#         if learn_var:
+#             self.rho = nn.Parameter(self.rho)
+#         self.learn_var = learn_var
+
+#     def forward(self, input):
+#         print(F.softplus(self.rho))
+#         return self.mean(input), F.softplus(self.rho).repeat(input.shape[0])
+
+#     def state_dict(self, destination=None, prefix='', keep_vars=False):
+#         return {
+#             "mean": self.mean.state_dict(destination, prefix, keep_vars),
+#             "rho": self.rho
+#         }
+
+#     def load_state_dict(self, state):
+#         self.mean.load_state_dict(state["mean"])
+#         self.rho = state["rho"]
+
+#     def train_model(self, epochs, optimizer_factory, loss_reduction, *args, **kwargs):
+#         if self.learn_var:
+#             optimizer_factory_ext = lambda p: optimizer_factory(list(p) + [self.rho])
+#         else:
+#             optimizer_factory_ext = optimizer_factory
+        
+#         loss_fn = lambda output, target: F.gaussian_nll_loss(output, target, F.softplus(self.rho).repeat(output.shape[0])**2, reduction=loss_reduction)
+#         return self.mean.train_model(epochs, loss_fn, optimizer_factory_ext, *args, **kwargs)
+        
+#     def infer(self, input, samples):
+#         means = self.mean.infer(input, samples)
+#         return torch.stack((means, F.softplus(self.rho).expand(means.shape)), dim=-1)
+#         #return list(zip(self.mean.infer(input, samples), F.softplus(self.rho).repeat(samples)))
+
+#     def all_losses(self):
+#         return self.mean.all_losses()
+
+#     @property
+#     def var(self):
+#         return F.softplus(self.rho)
+
+class GaussLayer(nn.Module):
+    def __init__(self, std_init: torch.Tensor, learn_var: bool = False):
         super().__init__()
-        self.mean = mean
         self.rho = torch.log(torch.exp(std_init) - 1)
         if learn_var:
             self.rho = nn.Parameter(self.rho)
         self.learn_var = learn_var
 
     def forward(self, input):
-        print(F.softplus(self.rho))
-        return self.mean(input), F.softplus(self.rho).repeat(input.shape[0])
+        return torch.stack((input, F.softplus(self.rho).expand(input.shape)), dim=-1)
 
-    def state_dict(self):
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
-            "mean": self.mean.state_dict(),
             "rho": self.rho
         }
 
     def load_state_dict(self, state):
-        self.mean.load_state_dict(state["mean"])
-        self.rho = state["rho"]
-
-    def train_model(self, epochs, optimizer_factory, loss_reduction, *args, **kwargs):
-        if self.learn_var:
-            optimizer_factory_ext = lambda p: optimizer_factory(list(p) + [self.rho])
-        else:
-            optimizer_factory_ext = optimizer_factory
-        
-        loss_fn = lambda output, target: F.gaussian_nll_loss(output, target, F.softplus(self.rho).repeat(output.shape[0])**2, reduction=loss_reduction)
-        return self.mean.train_model(epochs, loss_fn, optimizer_factory_ext, *args, **kwargs)
-        
-
-    def infer(self, input, samples):
-        means = self.mean.infer(input, samples)
-        return torch.stack((means, F.softplus(self.rho).expand(means.shape)), dim=-1)
-        #return list(zip(self.mean.infer(input, samples), F.softplus(self.rho).repeat(samples)))
+        self.rho = state["rho"] 
 
     def all_losses(self):
         return self.mean.all_losses()
 
     @property
     def var(self):
-        return F.softplus(self.rho)
+        return F.softplus(self.rho)**2
 
 def plot_losses(name, losses, ax):
     epochs = max([len(loss) for loss in losses])

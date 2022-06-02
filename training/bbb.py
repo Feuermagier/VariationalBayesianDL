@@ -15,9 +15,9 @@ class BBBModel(nn.Module):
         self.model = generate_model(layers)
         self.losses = []
 
-    def state_dict(self):
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
-            "model": self.model.state_dict(),
+            "model": self.model.state_dict(destination, prefix, keep_vars),
             "losses": self.losses
         }
 

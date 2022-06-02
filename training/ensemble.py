@@ -22,9 +22,9 @@ class Ensemble(nn.Module):
         super().__init__()
         self.models = nn.ModuleList(models)
 
-    def state_dict(self):
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
-            "models": [model.state_dict() for model in self.models]
+            "models": [model.state_dict(destination, prefix, keep_vars) for model in self.models]
         }
 
     def load_state_dict(self, dict):

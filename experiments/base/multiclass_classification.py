@@ -19,9 +19,9 @@ def eval_model(name, model, samples, testloader, device, path, log):
     with torch.no_grad():
         for data, target in testloader:
             output = model.infer(data.to(device), samples).mean(dim=0).cpu()
-            preds = torch.argmax(output, dim=1)
-            errors.append(preds == target)
-            confidences.append(output[torch.arange(output.shape[0]), preds].exp())
+            err, conf = _analyze_output(output, target)
+            errors.append(err)
+            confidences.append(conf)
             # outputs = eval_fn(data.to(device), samples).cpu()
             # sample_preds = torch.transpose(
             #     torch.argmax(outputs, dim=2), 0, 1)
@@ -38,13 +38,15 @@ def eval_model(name, model, samples, testloader, device, path, log):
     fig, ax = plt.subplots()
     util.plot_losses(name, model.all_losses(), ax)
     fig.set_tight_layout(True)
-    fig.savefig(path + "loss.pdf")
+    if path is not None:
+        fig.savefig(path + "loss.pdf")
 
     # Plot calibration
     fig, ax = plt.subplots()
     ece = reliability_diagram(10, errors, confidences, ax, include_accuracy=False, include_ace=False)
     fig.set_tight_layout(True)
-    fig.savefig(path + "reliability.pdf")
+    if path is not None:
+        fig.savefig(path + "reliability.pdf")
 
     # Print results
     log.info(f"Accuracy: {accuracy}")
@@ -82,9 +84,9 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
             with torch.no_grad():
                 for data, target in loader:
                     output = eval_fn(data.to(device), eval_samples).mean(dim=0).cpu()
-                    preds = torch.argmax(output, dim=1)
-                    errors.append(preds == target)
-                    confidences.append(output[torch.arange(output.shape[0]), preds].exp() - 1 / output.shape[-1])
+                    err, conf = _analyze_output(output, target)
+                    errors.append(err)
+                    confidences.append(conf)
                     # outputs = eval_fn(data.to(device), eval_samples).cpu()
                     # sample_preds = torch.transpose(
                     #     torch.argmax(outputs, dim=2), 0, 1)
@@ -104,3 +106,10 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
     fig.tight_layout()
     fig.subplots_adjust(left=0.2, top=0.95)
     return fig
+
+def _analyze_output(output, target):
+    preds = torch.argmax(output, dim=1)
+    errors = preds == target
+    classes = target.shape[-1]
+    confidences = torch.clamp((output[torch.arange(output.shape[0]), preds].exp() * classes - 1) / (classes - 1), 0, 1)
+    return errors, confidences

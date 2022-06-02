@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn.utils.convert_parameters import parameters_to_vector, vector_to_parameters
@@ -12,7 +11,7 @@ class SwagModel(nn.Module):
         super().__init__()
         self.model = generate_model(layers)
         self.losses = []
-        self.update_every_batches = config.get("update_every_batches", 1)
+        self.update_every_batches = config.get("update_every_batches", -1)
         self.deviation_samples = config.get("deviation_samples", 10)
         self.start_epoch = config.get("start_epoch", 0)
         self.use_lr_cycles = config.get("use_lr_cycles", False)
@@ -28,9 +27,9 @@ class SwagModel(nn.Module):
         self.param_dist = None
         self.batches_since_swag_start = 0
 
-    def state_dict(self):
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
-            "model": self.model.state_dict(),
+            "model": self.model.state_dict(destination, prefix, keep_vars),
             "losses": self.losses,
             "updates": self.updates,
             "batches_since_swag_start": self.batches_since_swag_start,
@@ -53,6 +52,9 @@ class SwagModel(nn.Module):
         self.model.to(device)
         self.model.train()
         optimizer = optimizer_factory(self.model.parameters())
+
+        if self.update_every_batches == -1:
+            self.update_every_batches = np.ceil(len(loader) * (epochs - self.start_epoch) / self.deviation_samples)
 
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)

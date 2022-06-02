@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 from .network import generate_model
 
-class PointPredictor(nn.Module):
+class MAP(nn.Module):
     def __init__(self, layers):
         super().__init__()
         self.model = generate_model(layers)
         self.losses = []
 
-    def state_dict(self):
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
-            "model": self.model.state_dict(),
+            "model": self.model.state_dict(destination, prefix, keep_vars),
             "losses": self.losses
         }
 
@@ -39,6 +39,9 @@ class PointPredictor(nn.Module):
                 print(f"Epoch {epoch}: loss {epoch_loss}")
         if report_every_epochs >= 0:
             print(f"Final loss {epoch_loss}")
+
+    def forward(self, input, samples=1):
+        return self.infer(input, samples)
 
     def infer(self, input, samples):
         self.model.eval()
