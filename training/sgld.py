@@ -6,8 +6,11 @@ import copy
 
 from .network import generate_model
 
-def sgld(lr):
-    return lambda params: SGLD(params, lr=lr)
+def sgld(lr, temperature=1):
+    return lambda params: SGLD(params, lr=lr, temperature=temperature)
+
+def psgld(lr, temperature=1):
+    return lambda params: PSGLD(params, lr=lr, temperature=temperature)
 
 class SGLDModule(nn.Module):
     def __init__(self, layers, burnin_epochs, sample_interval):
@@ -41,12 +44,15 @@ class SGLDModule(nn.Module):
                 data, target = data.to(device), target.to(device)
                 optimizer.zero_grad()
                 output = self.model(data)
-                loss = loss_fn(output, target) * len(loader) * data.shape[-1] / 2
+                loss = loss_fn(output, target) * len(loader) * data.shape[-1]
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.cpu()
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
+
+            if epoch == self.burnin_epochs and report_every_epochs >= 0:
+                print(f"SGLD: Burnin completed in epoch {epoch}; now collecting posterior samples")
 
             if epoch >= self.burnin_epochs and (epoch - self.burnin_epochs) % self.sample_interval == 0:
                 self.samples.append(copy.deepcopy(self.model.state_dict()))
@@ -54,7 +60,7 @@ class SGLDModule(nn.Module):
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")
         if report_every_epochs >= 0:
-            print(f"Final loss {epoch_loss}")
+            print(f"SGLD: Collected {len(self.samples)} posterior samples")
 
     def infer(self, input, samples):
         self.model.eval()
@@ -71,8 +77,9 @@ class SGLDModule(nn.Module):
 
 # Inspired by https://github.com/alisiahkoohi/Langevin-dynamics/blob/master/langevin_sampling/SGLD.py
 class SGLD(torch.optim.SGD):
-    def __init__(self, params, lr=required, momentum=0, dampening=0, weight_decay=0, nesterov=False):
+    def __init__(self, params, lr=required, temperature=1, momentum=0, dampening=0, weight_decay=0, nesterov=False):
         super().__init__(params, lr=lr, momentum=momentum, dampening=dampening, weight_decay=weight_decay, nesterov=nesterov)
+        self.temperature = temperature
 
     def step(self, closure=None):
         loss = super().step(closure)
@@ -82,7 +89,32 @@ class SGLD(torch.optim.SGD):
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                noise = torch.normal(torch.zeros_like(p), np.sqrt(lr))
+                noise = torch.normal(torch.zeros_like(p), np.sqrt(2 * lr * self.temperature))
                 p.data.add_(noise)
+
+        return loss
+
+class PSGLD(torch.optim.RMSprop):
+    def __init__(self, params, lr=required, temperature=1, alpha=0.99, eps=1e-05, weight_decay=0, momentum=0, centered=False):
+        super().__init__(params, lr=lr, alpha=alpha, eps=eps, weight_decay=weight_decay, momentum=momentum, centered=centered)
+        self.temperature = temperature
+
+    def step(self, closure=None):
+        loss = super().step(closure)
+
+        for group in self.param_groups:
+            lr = group["lr"]
+            eps = group["eps"]
+
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+
+                state = self.state[p]
+
+                square_avg = state["square_avg"]
+                avg = square_avg.sqrt().add_(eps)
+                noise = torch.normal(torch.zeros_like(p), 1)
+                p.data.addcdiv_(noise, avg.sqrt(), value=np.sqrt(2 * lr * self.temperature))
 
         return loss
