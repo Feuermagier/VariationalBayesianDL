@@ -3,10 +3,9 @@
 name: "SLURM"
 partition: "gpu_4"
 job-name: "bdl-fmnist"
-num_parallel_jobs: 1
+num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
-cpu-per-task: 2
 mem-per-cpu: 1000
 time: 30
 sbatch_args:
@@ -15,7 +14,7 @@ sbatch_args:
 ---
 name: "DEFAULT"
 path: "results"
-repetitions: 1
+repetitions: 10
 reps_per_job: 1
 reps_in_parallel: 1
 
