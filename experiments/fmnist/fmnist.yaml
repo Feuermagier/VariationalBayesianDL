@@ -45,7 +45,7 @@ params:
   model: "swag"
   swag_config:
     deviation_samples: 30
-    start_epoch: 15
+    start_epoch: 25
   lr: 0.1
   epochs: 30
 
@@ -56,7 +56,7 @@ params:
   members: 5
   swag_config:
     deviation_samples: 30
-    start_epoch: 15
+    start_epoch: 25
   lr: 0.1
   epochs: 30
 

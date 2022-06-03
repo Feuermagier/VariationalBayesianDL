@@ -39,7 +39,7 @@ def run(device, config, out_path, log):
     elif model == "mc_dropout":
         trained_model = run_mc_dropout(device, trainloader, config, out_path)
     elif model == "multi_mc_dropout":
-        trained_model = run_mc_dropout(device, trainloader, config, out_path)
+        trained_model = run_multi_mc_dropout(device, trainloader, config, out_path)
     elif model == "mfvi":
         trained_model = run_mfvi(device, trainloader, config, out_path)
     else:

@@ -2,12 +2,12 @@
 # Slurm config
 name: "SLURM"
 partition: "gpu_4"
-job-name: "bdl-fmnist"
+job-name: "bdl-fmnist-vi"
 num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 30
+time: 120
 sbatch_args:
   gres: "gpu:1"
 
