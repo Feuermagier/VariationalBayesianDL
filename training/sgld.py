@@ -47,7 +47,7 @@ class SGLDModule(nn.Module):
                 loss = loss_fn(output, target) * len(loader) * data.shape[-1]
                 loss.backward()
                 optimizer.step()
-                epoch_loss += loss.cpu()
+                epoch_loss += loss.cpu().item()
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
 

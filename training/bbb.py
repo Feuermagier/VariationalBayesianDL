@@ -39,29 +39,29 @@ class BBBModel(nn.Module):
                 data, target = data.to(device), target.to(device)
                 optimizer.zero_grad()
 
-                kl_loss = torch.tensor(0, dtype=torch.float)
-                data_loss = torch.tensor(0, dtype=torch.float)
+                kl_loss = torch.tensor(0, dtype=torch.float, device=data.device)
+                data_loss = torch.tensor(0, dtype=torch.float, device=data.device)
                 for _ in range(mc_samples):
                     output = self.model(data)
                     kl_loss += sum([getattr(layer, "kl", 0) for layer in self.model]) / data.shape[0]
                     data_loss += data_loss_fn(output, target)
 
-                kl_loss /= mc_samples
-                kl_loss *= pi
-                data_loss /= mc_samples
-
-                kl_loss.backward(retain_graph=True)
+                loss = (pi * kl_loss + data_loss) / mc_samples
+                loss.backward()
+                # kl_loss /= mc_samples
+                # kl_loss *= pi
+                # data_loss /= mc_samples
+                # kl_loss.backward(retain_graph=True)
                 #kl_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
                 #kl_grads.append(kl_grad)
-
-                data_loss.backward()
+                # data_loss.backward()
                 #data_grad = torch.cat([module.rho_grads() for module in self.model if hasattr(module, "rho_grads")])
                 #data_grad -= kl_grad
                 #data_grads.append(data_grad)
 
                 #nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
                 optimizer.step()
-                epoch_loss += pi * kl_loss + data_loss
+                epoch_loss += loss.cpu().item()
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:

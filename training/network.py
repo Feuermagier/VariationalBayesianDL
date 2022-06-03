@@ -6,7 +6,7 @@ import numpy as np
 import itertools
 
 from training.util import GaussLayer
-from training.bbb_layers import BBBLinear, LowRankBBBLinear
+from training.bbb_layers import BBBLinear, LowRankBBBLinear, BBBConvolution
 from training.dropout import FixableDropout
 
 def map_activation(name):
@@ -46,6 +46,9 @@ def generate_model(architecture, print_summary=False):
         elif ty == "conv":
             (in_channels, out_channels, kernel_size) = size
             layers.append(nn.Conv2d(in_channels, out_channels, kernel_size))
+        elif ty == "v_conv":
+            (in_channels, out_channels, kernel_size, prior, args) = size
+            layers.append(BBBConvolution(in_channels, out_channels, kernel_size, prior, prior, **args))
         elif ty == "dropout":
             p, = size
             layers.append(FixableDropout(p))

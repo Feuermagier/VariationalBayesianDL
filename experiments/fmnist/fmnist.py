@@ -12,7 +12,7 @@ import experiments.base.multiclass_classification as exp
 from training.util import sgd
 from training.pp import MAP
 from training.ensemble import Ensemble
-from training.bbb import BBBModel
+from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
 
 def run(device, config, out_path, log):
@@ -40,6 +40,8 @@ def run(device, config, out_path, log):
         trained_model = run_mc_dropout(device, trainloader, config, out_path)
     elif model == "multi_mc_dropout":
         trained_model = run_mc_dropout(device, trainloader, config, out_path)
+    elif model == "mfvi":
+        trained_model = run_mfvi(device, trainloader, config, out_path)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -191,6 +193,29 @@ def run_multi_mc_dropout(device, trainloader, config, model_out_path):
     model = Ensemble([MAP(layers) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     torch.save(model.state_dict(), model_out_path + f"multi_mc_dropout_{members}.tar")
+    return model
+
+def run_mfvi(device, trainloader, config, model_out_path):
+    prior = GaussianPrior(0, 1)
+    layers = [
+        ("v_conv", (1, 6, 5, prior, {})),
+        ("relu", ()),
+        ("pool", 2),
+        ("v_conv", (6, 16, 5, prior, {})),
+        ("relu", ()),
+        ("pool", 2),
+        ("flatten", ()),
+        ("v_fc", (16 * 4 * 4, 120, prior, {})),
+        ("relu", ()),
+        ("v_fc", (120, 84, prior, {})),
+        ("relu", ()),
+        ("v_fc", (84, 10, prior, {})),
+        ("logsoftmax", ())
+    ]
+
+    model = BBBModel(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
     return model
 
 ####################### CW2 #####################################

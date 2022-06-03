@@ -42,7 +42,7 @@ class RMSModule(nn.Module):
                 loss = data_loss + self.reg_scale * reg_loss
                 loss.backward()
                 optimizer.step()
-                epoch_loss += loss.cpu()
+                epoch_loss += loss.cpu().item()
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:

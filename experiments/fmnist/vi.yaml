@@ -1,0 +1,34 @@
+---
+# Slurm config
+name: "SLURM"
+partition: "gpu_4"
+job-name: "bdl-fmnist"
+num_parallel_jobs: 120
+ntasks: 1
+cpus-per-task: 1
+mem-per-cpu: 1000
+time: 30
+sbatch_args:
+  gres: "gpu:1"
+
+---
+name: "DEFAULT"
+path: "results"
+repetitions: 10
+reps_per_job: 1
+reps_in_parallel: 1
+
+params:
+  batch_size: 20
+  data_path: "../../data/"
+  eval: "corrupted"
+  eval_samples: 100
+
+---
+name: "MFVI"
+params:
+  model: "mfvi"
+  lr: 0.1
+  epochs: 30
+  mc_samples: 2
+  kl_rescaling: 0.1

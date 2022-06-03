@@ -106,7 +106,7 @@ class GaussLayer(nn.Module):
 def plot_losses(name, losses, ax):
     epochs = max([len(loss) for loss in losses])
     ax.set_xlabel("Epoch", fontsize=14)
-    ax.set_xticks(np.arange(0, epochs + 1, epochs // 10))
+    ax.set_xticks(np.arange(0, epochs + 1, epochs // 10 if epochs > 10 else 1))
     ax.set_ylabel("Training Loss", fontsize=14)
     if len(losses) > 1:
         for i, single_losses in enumerate(losses):
