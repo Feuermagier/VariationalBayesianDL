@@ -28,7 +28,7 @@ params:
 name: "MFVI"
 params:
   model: "mfvi"
-  lr: 0.1
-  epochs: 30
+  lr: 0.01
+  epochs: 60
   mc_samples: 2
   kl_rescaling: 0.1

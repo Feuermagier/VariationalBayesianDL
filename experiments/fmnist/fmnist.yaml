@@ -29,7 +29,7 @@ name: "MAP"
 params:
   model: "map"
   lr: 0.1
-  epochs: 20
+  epochs: 30
 
 ---
 name: "Ensemble-5"
@@ -37,7 +37,7 @@ params:
   model: "ensemble"
   members: 5
   lr: 0.1
-  epochs: 20
+  epochs: 30
 
 ---
 name: "SWAG"
@@ -47,7 +47,7 @@ params:
     deviation_samples: 30
     start_epoch: 15
   lr: 0.1
-  epochs: 20
+  epochs: 30
 
 ---
 name: "MultiSWAG"
@@ -58,7 +58,7 @@ params:
     deviation_samples: 30
     start_epoch: 15
   lr: 0.1
-  epochs: 20
+  epochs: 30
 
 ---
 name: "MCDropout"
@@ -66,7 +66,7 @@ params:
   model: "mc_dropout"
   p: 0.1
   lr: 0.1
-  epochs: 20
+  epochs: 40
 
 ---
 name: "MultiMCDropout"
@@ -75,4 +75,4 @@ params:
   members: 5
   p: 0.1
   lr: 0.1
-  epochs: 20
+  epochs: 40
