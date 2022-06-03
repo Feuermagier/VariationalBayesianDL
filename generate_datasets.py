@@ -56,4 +56,6 @@ for name, url in datasets.items():
     if not Path(DATA_PATH + "UCI/" + filename).exists():
         print(f"Downloading {name}...")
         urllib.request.urlretrieve(url, DATA_PATH + "UCI/" + filename)
-    zipfile.ZipFile(DATA_PATH + "UCI/CCPP.zip").extractall(DATA_PATH + "UCI/")
+
+print(f"Extracting dataset...")
+zipfile.ZipFile(DATA_PATH + "UCI/CCPP.zip").extractall(DATA_PATH + "UCI/")
