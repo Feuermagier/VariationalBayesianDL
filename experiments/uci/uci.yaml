@@ -1,0 +1,80 @@
+---
+# Slurm config
+name: "SLURM"
+partition: "single"
+job-name: "bdl-uci"
+num_parallel_jobs: 120
+ntasks: 1
+cpus-per-task: 2
+mem-per-cpu: 1000
+time: 30
+
+---
+name: "DEFAULT"
+path: "results"
+repetitions: 1
+reps_per_job: 1
+reps_in_parallel: 1
+
+params:
+  batch_size: 32
+  data_path: "../../data/"
+  eval: "normal"
+  test_percentage: 0.2
+  eval_samples: 1000
+  init_var: 0.1
+list:
+  dataset: ["housing", "concrete", "energy", "power", "wine", "yacht"]
+
+---
+name: "MAP"
+params:
+  model: "map"
+  lr: 0.01
+  epochs: 20
+
+---
+name: "Ensemble-5"
+params:
+  model: "ensemble"
+  members: 5
+  lr: 0.01
+  epochs: 20
+
+---
+name: "SWAG"
+params:
+  model: "swag"
+  swag_config:
+    deviation_samples: 30
+    start_epoch: 10
+  lr: 0.01
+  epochs: 30
+
+---
+name: "MultiSWAG"
+params:
+  model: "multi_swag"
+  members: 5
+  swag_config:
+    deviation_samples: 30
+    start_epoch: 10
+  lr: 0.1
+  epochs: 30
+
+---
+name: "MCDropout"
+params:
+  model: "mc_dropout"
+  p: 0.1
+  lr: 0.01
+  epochs: 100
+
+---
+name: "MultiMCDropout"
+params:
+  model: "multi_mc_dropout"
+  members: 5
+  p: 0.1
+  lr: 0.01
+  epochs: 100

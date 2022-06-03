@@ -1,34 +1,12 @@
 import numpy as np
 import torch
-import os
-from os import path
 import pandas as pd
-import zipfile
-import urllib.request
-
+from training import util
 
 class UCIDatasets():
     def __init__(self,  name,  data_path, test_percentage=0.2, normalize=True, subsample=1):
-        self.datasets = {
-            "housing": "https://archive.ics.uci.edu/ml/machine-learning-databases/housing/housing.data",
-            "concrete": "https://archive.ics.uci.edu/ml/machine-learning-databases/concrete/compressive/Concrete_Data.xls",
-            "energy": "http://archive.ics.uci.edu/ml/machine-learning-databases/00242/ENB2012_data.xlsx",
-            "power": "https://archive.ics.uci.edu/ml/machine-learning-databases/00294/CCPP.zip",
-            "wine": "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv",
-            "yacht": "http://archive.ics.uci.edu/ml/machine-learning-databases/00243/yacht_hydrodynamics.data"}
         self.data_path = data_path
         self.name = name
-
-        if self.name not in self.datasets:
-            raise ValueError("Unknown")
-        if not path.exists(self.data_path+"UCI"):
-            os.mkdir(self.data_path+"UCI")
-
-        url = self.datasets[self.name]
-        file_name = url.split('/')[-1]
-        if not path.exists(self.data_path+"UCI/" + file_name):
-            urllib.request.urlretrieve(
-                self.datasets[self.name], self.data_path+"UCI/" + file_name)
 
         if self.name == "housing":
             data = pd.read_csv(self.data_path+'UCI/housing.data',
@@ -41,7 +19,7 @@ class UCIDatasets():
             data = pd.read_excel(self.data_path+'UCI/ENB2012_data.xlsx',
                                  header=0).values
         elif self.name == "power":
-            zipfile.ZipFile(self.data_path +"UCI/CCPP.zip").extractall(self.data_path +"UCI/")
+            
             data = pd.read_excel(self.data_path+'UCI/CCPP/Folds5x2_pp.xlsx', header=0).values
         elif self.name == "wine":
             data = pd.read_csv(self.data_path + 'UCI/winequality-red.csv',

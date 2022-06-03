@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import sklearn.datasets
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import torch.nn.functional as F
@@ -65,6 +66,8 @@ def plot_calibration(title, results, ax, include_text=True):
     ax.plot([0, 1], [0,1], color="royalblue")
     ax.plot(results.quantile_ps, results.observed_cdf, "o-", color="darkorange")
     ax.set_xlim(0, 1)
+    ax.set_xticks(results.quantile_ps)
+    ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.2f"))
     ax.set_ylim(0, 1)
     if include_text:
         if title is not None:
