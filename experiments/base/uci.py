@@ -1,10 +1,11 @@
 import numpy as np
 import torch
+from torch.utils.data.dataset import ConcatDataset, Subset, TensorDataset
 import pandas as pd
 from training import util
 
 class UCIDatasets():
-    def __init__(self,  name,  data_path, test_percentage=0.2, normalize=True, subsample=1):
+    def __init__(self,  name,  data_path, test_percentage=0.2, validation_percentage=0.3, create_gap_splits=True, normalize=True, subsample=1):
         self.data_path = data_path
         self.name = name
 
@@ -46,6 +47,18 @@ class UCIDatasets():
         self.target_std = self.std[-1].unsqueeze(-1)
         data = (data - self.mean) / self.std
         
-        self.dataset = torch.utils.data.TensorDataset(data[:,:-1], data[:,-1].unsqueeze(-1))
+        self.dataset = TensorDataset(data[:,:-1], data[:,-1].unsqueeze(-1))
         test_sample_count = int(test_percentage * self.sample_count)
         self.train_set, self.test_set = torch.utils.data.random_split(self.dataset, [self.sample_count - test_sample_count, test_sample_count])
+
+        val_perm = torch.randperm(int(len(self.test_set) * validation_percentage))
+        self.validation_set = Subset(self.test_set, val_perm)
+
+        if create_gap_splits:
+            self.gap_splits = []
+            for dim in range(self.in_dim):
+                indices = torch.argsort(self.dataset.tensors[0][:,dim])
+                points = len(indices)
+                trainset = ConcatDataset([Subset(self.dataset, indices[:int(points / 3)]), Subset(self.dataset, indices[2*int(points/3):])])
+                testset = Subset(self.dataset, indices[int(points/3):int(2*points/3)])
+                self.gap_splits.append((trainset, testset))

@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import time
 
 from experiments.base.uci import UCIDatasets
+from experiments.uci.results import UCIResults
+
 from cw2.cw_data import cw_logging
 from cw2 import experiment, cw_error, cluster_work
 
@@ -23,63 +25,68 @@ def run(device, config, out_path, log):
     dataset = UCIDatasets(config["dataset"], config["data_path"],
                           test_percentage=config["test_percentage"], normalize=True, subsample=1)
 
-    trainloader = torch.utils.data.DataLoader(
-        dataset.train_set, config["batch_size"], shuffle=False)
-    if config["eval"] == "normal":
-        testloader = torch.utils.data.DataLoader(
-            dataset.test_set, config["batch_size"], shuffle=False)
+    if config["gap"] is True:
+        loaders = [(torch.utils.data.DataLoader(split[0], config["batch_size"], shuffle=False),
+            torch.utils.data.DataLoader(split[1], config["batch_size"], shuffle=False)) for split in dataset.gap_splits]
     else:
-        raise ValueError(f"Unknown eval dataset type '{config['eval']}'")
+        loaders = [(torch.utils.data.DataLoader(dataset.train_set, config["batch_size"], shuffle=False),
+            torch.utils.data.DataLoader(dataset.test_set, config["batch_size"], shuffle=False))]
 
-    init_var = torch.tensor(config["init_var"]).to(device)
-    model = config["model"]
+    for i, (trainloader, testloader) in enumerate(loaders):
 
-    before = time.time()
-    if model == "map":
-        trained_model = run_map(device, trainloader,
-                                dataset.in_dim, init_var, config, out_path)
-    elif model == "ensemble":
-        trained_model = run_ensemble(
-            device, trainloader, dataset.in_dim, init_var, config, out_path)
-    elif model == "swag":
-        trained_model = run_swag(
-            device, trainloader, dataset.in_dim, init_var, config, out_path)
-    elif model == "multi_swag":
-        trained_model = run_multi_swag(
-            device, trainloader, dataset.in_dim, init_var, config, out_path)
-    elif model == "mc_dropout":
-        trained_model = run_mc_dropout(
-            device, trainloader, dataset.in_dim, init_var, config, out_path)
-    elif model == "multi_mc_dropout":
-        trained_model = run_multi_mc_dropout(
-            device, trainloader, dataset.in_dim, init_var, config, out_path)
-    elif model == "mfvi":
-        trained_model = run_mfvi(
-            device, trainloader, dataset.in_dim, init_var, config, out_path)
-    else:
-        raise ValueError(f"Unknown model type '{model}'")
+        init_var = torch.tensor(config["init_var"]).to(device)
+        model = config["model"]
 
-    after = time.time()
-    log.info(f"Time: {after - before}s")
+        before = time.time()
+        if model == "map":
+            trained_model = run_map(device, trainloader,
+                                    dataset.in_dim, init_var, config, out_path)
+        elif model == "ensemble":
+            trained_model = run_ensemble(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "swag":
+            trained_model = run_swag(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "multi_swag":
+            trained_model = run_multi_swag(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "mc_dropout":
+            trained_model = run_mc_dropout(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "multi_mc_dropout":
+            trained_model = run_multi_mc_dropout(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "mfvi":
+            trained_model = run_mfvi(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
+        else:
+            raise ValueError(f"Unknown model type '{model}'")
 
-    results = RegressionResults(testloader, model, trained_model.infer,
-                                config["eval_samples"], device, target_mean=dataset.target_mean, target_std=dataset.target_std)
-    log.info(f"Avg LML: {results.average_lml}")
-    log.info(f"Mean MSE: {results.mean_mse}")
-    log.info(f"MSE of Means: {results.mse_of_means}")
-    log.info(f"QCE: {results.qce}")
+        after = time.time()
+        log.info(f"Time: {after - before}s")
 
-    # Plot loss
-    fig, ax = plt.subplots()
-    plot_losses(model, trained_model.all_losses(), ax)
-    fig.set_tight_layout(True)
-    fig.savefig(out_path + "loss.pdf")
+        torch.save(trained_model.state_dict(), out_path + f"map_{i}.tar")
 
-    # Plot calibration
-    fig, ax = plt.subplots()
-    plot_calibration(None, results, ax, include_text=True)
-    fig.set_tight_layout(True)
-    fig.savefig(out_path + "reliability.pdf")
+        results = RegressionResults(testloader, model, trained_model.infer,
+                                    config["eval_samples"], device, target_mean=dataset.target_mean, target_std=dataset.target_std)
+        log.info(f"Avg LML: {results.average_lml}")
+        log.info(f"Mean MSE: {results.mean_mse}")
+        log.info(f"MSE of Means: {results.mse_of_means}")
+        log.info(f"QCE: {results.qce}")
+
+        UCIResults(model, config["dataset"], results, after - before).store(out_path + f"results_{i}.pyc")
+
+        # Plot loss
+        fig, ax = plt.subplots()
+        plot_losses(model, trained_model.all_losses(), ax)
+        fig.set_tight_layout(True)
+        fig.savefig(out_path + f"loss_{i}.pdf")
+
+        # Plot calibration
+        fig, ax = plt.subplots()
+        plot_calibration(None, results, ax, include_text=True)
+        fig.set_tight_layout(True)
+        fig.savefig(out_path + f"reliability_{i}.pdf")
 
 
 def run_map(device, trainloader, in_dim, init_var, config, model_out_path):
@@ -93,7 +100,7 @@ def run_map(device, trainloader, in_dim, init_var, config, model_out_path):
     model = MAP(layers)
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + "map.tar")
+    
     return model
 
 
