@@ -19,7 +19,7 @@ reps_in_parallel: 1
 params:
   batch_size: 32
   data_path: "../../data/"
-  eval: "normal"
+  gap: False
   test_percentage: 0.2
   eval_samples: 1000
   init_var: 0.1
@@ -59,7 +59,7 @@ params:
   swag_config:
     deviation_samples: 30
     start_epoch: 20
-  lr: 0.1
+  lr: 0.01
   epochs: 40
 
 ---
@@ -68,7 +68,7 @@ params:
   model: "mc_dropout"
   p: 0.1
   lr: 0.01
-  epochs: 50
+  epochs: 30
 
 ---
 name: "MultiMCDropout"
@@ -77,4 +77,4 @@ params:
   members: 5
   p: 0.1
   lr: 0.01
-  epochs: 50
+  epochs: 30
