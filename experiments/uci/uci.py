@@ -20,7 +20,6 @@ from training.regresssion import RegressionResults, plot_calibration
 
 
 def run(device, config, out_path, log):
-    torch.manual_seed(42)
 
     dataset = UCIDatasets(config["dataset"], config["data_path"],
                           test_percentage=config["test_percentage"], normalize=True, subsample=1)
@@ -219,6 +218,8 @@ class UCIExperiment(experiment.AbstractExperiment):
         l.info(config["params"])
         l.info("Using the CPU")
         device = torch.device("cpu")
+
+        torch.manual_seed(rep * 42)
 
         run(device, config["params"], config["_rep_log_path"], l)
 

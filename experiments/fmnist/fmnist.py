@@ -16,7 +16,6 @@ from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
 
 def run(device, config, out_path, log):
-    torch.manual_seed(42)
     trainloader = mnist.fashion_trainloader(config["data_path"], config["batch_size"])
     if config["eval"] == "normal":
         testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"])
@@ -232,6 +231,8 @@ class FashionMNISTExperiment(experiment.AbstractExperiment):
         else:
             l.info("Using the CPU")
             device = torch.device("cpu")
+
+        torch.manual_seed(rep * 42)
 
         run(device, config["params"], config["_rep_log_path"], l)
     

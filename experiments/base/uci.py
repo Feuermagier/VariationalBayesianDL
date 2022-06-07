@@ -61,6 +61,4 @@ class UCIDatasets():
                 points = len(indices)
                 trainset = ConcatDataset([Subset(self.dataset, indices[:int(points / 3)]), Subset(self.dataset, indices[2*int(points/3):])])
                 testset = Subset(self.dataset, indices[int(points/3):int(2*points/3)])
-                print(len(trainset))
-                print(len(testset))
                 self.gap_splits.append((trainset, testset))
