@@ -17,12 +17,6 @@ from training.swag import SwagModel
 
 def run(device, config, out_path, log):
     trainloader = mnist.fashion_trainloader(config["data_path"], config["batch_size"])
-    if config["eval"] == "normal":
-        testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"])
-    elif config["eval"] == "corrupted":
-        testloader = mnist.corrupted_fashion_testloader(config["data_path"], config["batch_size"])
-    else:
-        raise ValueError(f"Unknown eval dataset '{config['eval']}'")
 
     model = config["model"]
 
@@ -41,13 +35,21 @@ def run(device, config, out_path, log):
         trained_model = run_multi_mc_dropout(device, trainloader, config, out_path)
     elif model == "mfvi":
         trained_model = run_mfvi(device, trainloader, config, out_path)
+    elif model == "multi_mfvi":
+        trained_model = run_multi_mfvi(device, trainloader, config, out_path)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
     after = time.time()
     log.info(f"Time: {after - before}s")
 
-    exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, log)
+
+    if "normal" in config["eval"]:
+        testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"])
+        exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "normal", log)
+    if "corrupted" in config["eval"]:
+        testloader = mnist.corrupted_fashion_testloader(config["data_path"], config["batch_size"])
+        exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "corrupted", log)
 
 def run_map(device, trainloader, config, model_out_path):
     layers = [
@@ -215,6 +217,30 @@ def run_mfvi(device, trainloader, config, model_out_path):
     model = BBBModel(layers)
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
+    return model
+
+def run_multi_mfvi(device, trainloader, config, model_out_path):
+    members = config["members"]
+    prior = GaussianPrior(0, 1)
+    layers = [
+        ("v_conv", (1, 6, 5, prior, {})),
+        ("relu", ()),
+        ("pool", 2),
+        ("v_conv", (6, 16, 5, prior, {})),
+        ("relu", ()),
+        ("pool", 2),
+        ("flatten", ()),
+        ("v_fc", (16 * 4 * 4, 120, prior, {})),
+        ("relu", ()),
+        ("v_fc", (120, 84, prior, {})),
+        ("relu", ()),
+        ("v_fc", (84, 10, prior, {})),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([BBBModel(layers) for _ in range(members)])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    torch.save(model.state_dict(), model_out_path + f"multi_mfvi.tar")
     return model
 
 ####################### CW2 #####################################

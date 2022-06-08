@@ -21,13 +21,23 @@ reps_in_parallel: 1
 params:
   batch_size: 20
   data_path: "../../data/"
-  eval: "corrupted"
+  eval: ["normal", "corrupted"]
   eval_samples: 100
 
 ---
 name: "MFVI"
 params:
   model: "mfvi"
+  lr: 0.01
+  epochs: 60
+  mc_samples: 2
+  kl_rescaling: 0.1
+
+---
+name: "MultiMFVI-5"
+params:
+  model: "multi_mfvi"
+  members: 5
   lr: 0.01
   epochs: 60
   mc_samples: 2

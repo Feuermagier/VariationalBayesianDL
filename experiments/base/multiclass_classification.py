@@ -10,7 +10,7 @@ from training import util
 from training.calibration import reliability_diagram
 
 
-def eval_model(name, model, samples, testloader, device, path, log):
+def eval_model(name, model, samples, testloader, device, path, testtype, log):
     torch.manual_seed(42)
 
     # Evaluate
@@ -39,18 +39,18 @@ def eval_model(name, model, samples, testloader, device, path, log):
     util.plot_losses(name, model.all_losses(), ax)
     fig.set_tight_layout(True)
     if path is not None:
-        fig.savefig(path + "loss.pdf")
+        fig.savefig(path + f"loss_{testtype}.pdf")
 
     # Plot calibration
     fig, ax = plt.subplots()
     ece = reliability_diagram(10, errors, confidences, ax, include_accuracy=False, include_ace=False)
     fig.set_tight_layout(True)
     if path is not None:
-        fig.savefig(path + "reliability.pdf")
+        fig.savefig(path + f"reliability_{testtype}.pdf")
 
     # Print results
-    log.info(f"Accuracy: {accuracy}")
-    log.info(f"ECE: {ece}")
+    log.info(f"{testtype} Accuracy: {accuracy}")
+    log.info(f"{testtype} ECE: {ece}")
 
 # models = [(name, eval_fn, loss_over_time, [ece_over_time per dataset in the same order], eval_samples)]
 # datasets = [(name, dataloader)]

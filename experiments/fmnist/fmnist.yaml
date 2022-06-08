@@ -21,7 +21,7 @@ reps_in_parallel: 1
 params:
   batch_size: 20
   data_path: "../../data/"
-  eval: "corrupted"
+  eval: ["normal", "corrupted"]
   eval_samples: 100
 
 ---

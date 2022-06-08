@@ -1,0 +1,36 @@
+---
+# Slurm config
+name: "SLURM"
+partition: "single"
+job-name: "bdl-uci"
+num_parallel_jobs: 120
+ntasks: 1
+cpus-per-task: 2
+mem-per-cpu: 1000
+time: 30
+
+---
+name: "DEFAULT"
+path: "results"
+repetitions: 10
+reps_per_job: 10
+reps_in_parallel: 1
+
+params:
+  batch_size: 32
+  data_path: "../../data/"
+  gap: True
+  test_percentage: 0.2
+  eval_samples: 1000
+  init_var: 0.1
+list:
+  dataset: ["housing", "concrete", "energy", "power", "wine", "yacht"]
+
+---
+name: "SGLD"
+params:
+  model: "sgld"
+  lr: 0.0001
+  epochs: 1100
+  burnin: 100
+  interval: 1
