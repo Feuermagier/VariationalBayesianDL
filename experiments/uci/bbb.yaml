@@ -27,8 +27,50 @@ list:
   dataset: ["housing", "concrete", "energy", "power", "wine", "yacht"]
 
 ---
-name: "BBB"
+name: "MFVI"
 params:
-  model: "bbb"
+  model: "mfvi"
   lr: 0.01
-  epochs: 20
+  epochs: 50
+  mc_samples: 2
+  kl_rescaling: 0.5
+
+---
+name: "LRVI-2"
+params:
+  model: "lrvi"
+  lr: 0.01
+  epochs: 50
+  mc_samples: 2
+  kl_rescaling: 0.5
+  k: 2
+
+---
+name: "LRVI-5"
+params:
+  model: "lrvi"
+  lr: 0.01
+  epochs: 50
+  mc_samples: 2
+  kl_rescaling: 0.5
+  k: 5
+
+---
+name: "LRVI-10"
+params:
+  model: "lrvi"
+  lr: 0.01
+  epochs: 50
+  mc_samples: 2
+  kl_rescaling: 0.5
+  k: 10
+
+---
+name: "Multi-MFVI-5"
+params:
+  model: "multi-mfvi"
+  members: 5
+  lr: 0.01
+  epochs: 50
+  mc_samples: 2
+  kl_rescaling: 0.5

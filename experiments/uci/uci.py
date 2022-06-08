@@ -58,6 +58,12 @@ def run(device, config, out_path, log):
         elif model == "mfvi":
             trained_model = run_mfvi(
                 device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "multi-mfvi":
+            trained_model = run_multi_mfvi(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "lrvi":
+            trained_model = run_lrvi(
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         else:
             raise ValueError(f"Unknown model type '{model}'")
 
@@ -201,6 +207,37 @@ def run_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
     ]
 
     model = BBBModel(layers)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
+                      device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
+    return model
+
+def run_lrvi(device, trainloader, in_dim, init_var, config, model_out_path):
+    k = config["k"]
+    layers = [
+        ("vlr_fc", (in_dim, 50, k, 1, {"rho_init": -3})),
+        ("relu", ()),
+        ("vlr_fc", (50, 1, k, 1, {"rho_init": -3})),
+        ("gauss", (init_var, True))
+    ]
+
+    model = BBBModel(layers)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
+                      device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
+    return model
+
+def run_multi_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
+    members = config["members"]
+    prior = GaussianPrior(0, 1)
+    layers = [
+        ("v_fc", (in_dim, 50, prior, {"rho_init": -3})),
+        ("relu", ()),
+        ("v_fc", (50, 1, prior, {"rho_init": -3})),
+        ("gauss", (init_var, True))
+    ]
+
+    model = Ensemble([BBBModel(layers) for _ in range(members)])
     model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
