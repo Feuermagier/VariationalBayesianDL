@@ -80,21 +80,15 @@ class GaussianMixture:
 class GaussLayer(nn.Module):
     def __init__(self, std_init: torch.Tensor, learn_var: bool = False):
         super().__init__()
-        self.rho = torch.log(torch.exp(std_init) - 1)
+        rho = torch.log(torch.exp(std_init) - 1)
         if learn_var:
-            self.rho = nn.Parameter(self.rho)
+            self.rho = nn.Parameter(rho)
+        else:
+            self.register_buffer("rho", rho)
         self.learn_var = learn_var
 
     def forward(self, input):
         return torch.stack((input, F.softplus(self.rho).expand(input.shape)), dim=-1)
-
-    def state_dict(self, destination=None, prefix='', keep_vars=False):
-        return {
-            "rho": self.rho
-        }
-
-    def load_state_dict(self, state):
-        self.rho = state["rho"] 
 
     def all_losses(self):
         return self.mean.all_losses()
