@@ -61,7 +61,7 @@ def reliability_diagram(bin_count, errors, confidences, ax, include_accuracy=Tru
             transform=ax.transAxes, fontsize=16, verticalalignment="top", 
             bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
 
-    return ece
+    return ece, [len(bin) for bin in static_bins], bin_errors, 
 
 def _create_static_bins(bin_count, confidences):
     bins = [[] for _ in range(bin_count)]
@@ -89,3 +89,15 @@ def _max_calibration_error(bins, errors, confidences):
     bin_accuracys = np.array([errors[bin].sum() / len(bin) if len(bin) > 0 else 0 for bin in bins])
     bin_confidences = np.array([confidences[bin].sum() / len(bin) if len(bin) > 0 else 0 for bin in bins])
     return np.max(np.abs(bin_accuracys - bin_confidences))
+
+class ClassificationCalibrationResults:
+    def __init__(self, bin_count, errors, confidences):
+        bins = _create_static_bins(bin_count, confidences)
+        self.bin_accuracys = np.array([errors[bin].sum() / len(bin) if len(bin) > 0 else 0 for bin in bins])
+        self.bin_confidences = np.array([confidences[bin].sum() / len(bin) if len(bin) > 0 else 0 for bin in bins])
+        self.ece = 0
+        for i in range(len(bins)):
+            self.ece += len(bins[i]) * np.abs(self.bin_accuracys[i] - self.bin_confidences[i])
+        self.ece /= len(confidences)
+
+        self.bin_counts = [len(bin) for bin in bins]

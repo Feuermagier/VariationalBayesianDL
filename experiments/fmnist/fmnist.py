@@ -1,4 +1,6 @@
 import sys
+
+from experiments.fmnist.results import FMNISTResults
 sys.path.append("../../")
 
 import torch
@@ -16,7 +18,8 @@ from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
 
 def run(device, config, out_path, log):
-    trainloader = mnist.fashion_trainloader(config["data_path"], config["batch_size"])
+    class_exclusion = config["classes"]
+    trainloader = mnist.fashion_trainloader(config["data_path"], config["batch_size"], exclude_classes=class_exclusion)
 
     model = config["model"]
 
@@ -43,13 +46,17 @@ def run(device, config, out_path, log):
     after = time.time()
     log.info(f"Time: {after - before}s")
 
+    #torch.save(trained_model.state_dict(), out_path + "model.tar")
 
+    classes = [i for i in range(10) if i not in class_exclusion]
     if "normal" in config["eval"]:
-        testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"])
-        exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "normal", log)
+        testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
+        acc, cal_res = exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "normal", log)
+        FMNISTResults(model, "standard", acc, cal_res).store(out_path + "results_normal.pyc")
     if "corrupted" in config["eval"]:
-        testloader = mnist.corrupted_fashion_testloader(config["data_path"], config["batch_size"])
-        exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "corrupted", log)
+        testloader = mnist.corrupted_fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
+        acc, cal_res = exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "corrupted", log)
+        FMNISTResults(model, "corrupted", acc, cal_res).store(out_path + "results_corrupted.pyc")
 
 def run_map(device, trainloader, config, model_out_path):
     layers = [
@@ -70,7 +77,6 @@ def run_map(device, trainloader, config, model_out_path):
 
     model = MAP(layers)
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + "map.tar")
     return model
 
 def run_ensemble(device, trainloader, config, model_out_path):
@@ -93,7 +99,6 @@ def run_ensemble(device, trainloader, config, model_out_path):
 
     model = Ensemble([MAP(layers) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"ensemble-{members}.tar")
     return model
 
 def run_swag(device, trainloader, config, model_out_path):
@@ -117,7 +122,6 @@ def run_swag(device, trainloader, config, model_out_path):
 
     model = SwagModel(layers, swag_config)
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + "swag.tar")
     return model
 
 def run_multi_swag(device, trainloader, config, model_out_path):
@@ -142,7 +146,6 @@ def run_multi_swag(device, trainloader, config, model_out_path):
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"multi_swag_{members}.tar")
     return model
 
 def run_mc_dropout(device, trainloader, config, model_out_path):
@@ -167,7 +170,6 @@ def run_mc_dropout(device, trainloader, config, model_out_path):
 
     model = MAP(layers)
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + "mc_dropout.tar")
     return model
 
 def run_multi_mc_dropout(device, trainloader, config, model_out_path):
@@ -193,7 +195,6 @@ def run_multi_mc_dropout(device, trainloader, config, model_out_path):
 
     model = Ensemble([MAP(layers) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"multi_mc_dropout_{members}.tar")
     return model
 
 def run_mfvi(device, trainloader, config, model_out_path):
@@ -216,7 +217,6 @@ def run_mfvi(device, trainloader, config, model_out_path):
 
     model = BBBModel(layers)
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
     return model
 
 def run_multi_mfvi(device, trainloader, config, model_out_path):
@@ -240,7 +240,6 @@ def run_multi_mfvi(device, trainloader, config, model_out_path):
 
     model = Ensemble([BBBModel(layers) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"multi_mfvi.tar")
     return model
 
 ####################### CW2 #####################################
