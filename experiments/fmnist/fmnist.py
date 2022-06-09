@@ -1,6 +1,4 @@
 import sys
-
-from experiments.fmnist.results import FMNISTResults
 sys.path.append("../../")
 
 import torch
@@ -10,6 +8,7 @@ from cw2 import experiment, cw_error, cluster_work
 from cw2.cw_data import cw_logging
 
 from experiments.base import mnist
+from experiments.fmnist.results import FMNISTResults
 import experiments.base.multiclass_classification as exp
 from training.util import sgd
 from training.pp import MAP
