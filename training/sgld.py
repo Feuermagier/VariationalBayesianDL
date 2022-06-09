@@ -36,7 +36,13 @@ class SGLDModule(nn.Module):
     def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
-        optimizer = optimizer_factory(self.model.parameters())
+        parameters = []
+        for layer in self.model:
+            if type(layer).__name__ == "GaussLayer":
+                parameters.append({"params": layer.parameters(), "noise": False})
+            else:
+                parameters.append({"params": layer.parameters(), "noise": True})
+        optimizer = optimizer_factory(parameters)
 
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)
@@ -86,6 +92,9 @@ class SGLD(torch.optim.SGD):
 
         for group in self.param_groups:
             lr = group["lr"]
+            if "noise" in group and group["noise"] is False:
+                continue
+
             for p in group["params"]:
                 if p.grad is None:
                     continue

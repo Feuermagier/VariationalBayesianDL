@@ -23,6 +23,7 @@ params:
   data_path: "../../data/"
   eval: ["normal", "corrupted"]
   eval_samples: 100
+  classes: []
 
 ---
 name: "MAP"
