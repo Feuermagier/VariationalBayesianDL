@@ -17,6 +17,7 @@ from training.bbb import BBBModel, GaussianPrior
 from training.ensemble import Ensemble
 from training.pp import MAP
 from training.regresssion import RegressionResults, plot_calibration
+from training.sgld import SGLDModule, sgld
 
 
 def run(device, config, out_path, log):
@@ -64,6 +65,8 @@ def run(device, config, out_path, log):
         elif model == "lrvi":
             trained_model = run_lrvi(
                 device, trainloader, dataset.in_dim, init_var, config, out_path)
+        elif model == "sgld":
+            trained_model = run_sgld(device, trainloader, dataset.in_dim, init_var, config, out_path)
         else:
             raise ValueError(f"Unknown model type '{model}'")
 
@@ -105,7 +108,6 @@ def run_map(device, trainloader, in_dim, init_var, config, model_out_path):
     model = MAP(layers)
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    
     return model
 
 
@@ -121,7 +123,6 @@ def run_ensemble(device, trainloader, in_dim, init_var, config, model_out_path):
     model = Ensemble([MAP(layers) for _ in range(members)])
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"ensemble-{members}.tar")
     return model
 
 
@@ -138,7 +139,6 @@ def run_swag(device, trainloader, in_dim, init_var, config, model_out_path):
     model = SwagModel(layers, swag_config)
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + "swag.tar")
     return model
 
 
@@ -156,8 +156,6 @@ def run_multi_swag(device, trainloader, in_dim, init_var, config, model_out_path
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path +
-               f"multi_swag_{members}.tar")
     return model
 
 
@@ -174,7 +172,6 @@ def run_mc_dropout(device, trainloader, in_dim, init_var, config, model_out_path
     model = MAP(layers)
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + "mc_dropout.tar")
     return model
 
 
@@ -192,8 +189,6 @@ def run_multi_mc_dropout(device, trainloader, in_dim, init_var, config, model_ou
     model = Ensemble([MAP(layers) for _ in range(members)])
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path +
-               f"multi_mc_dropout_{members}.tar")
     return model
 
 
@@ -209,7 +204,6 @@ def run_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
     model = BBBModel(layers)
     model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
     return model
 
 def run_lrvi(device, trainloader, in_dim, init_var, config, model_out_path):
@@ -224,7 +218,6 @@ def run_lrvi(device, trainloader, in_dim, init_var, config, model_out_path):
     model = BBBModel(layers)
     model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
     return model
 
 def run_multi_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
@@ -240,7 +233,19 @@ def run_multi_mfvi(device, trainloader, in_dim, init_var, config, model_out_path
     model = Ensemble([BBBModel(layers) for _ in range(members)])
     model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    torch.save(model.state_dict(), model_out_path + f"mfvi.tar")
+    return model
+
+def run_sgld(device, trainloader, in_dim, init_var, config, model_out_path):
+    layers = [
+        ("fc", (in_dim, 50)),
+        ("relu", ()),
+        ("fc", (50, 1)),
+        ("gauss", (init_var, True))
+    ]
+
+    model = SGLDModule(layers, config["burnin"], config["interval"])
+    model.train_model(config["epochs"], nll_loss, sgld(config["lr"]), trainloader, config["batch_size"],
+                      device, report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################
