@@ -54,6 +54,7 @@ class SGLDModule(nn.Module):
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.cpu().item()
+                #print(self.model[-1].var)
             epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
 
