@@ -52,7 +52,7 @@ class SGLDModule(nn.Module):
                 output = self.model(data)
                 loss = loss_fn(output, target) * len(loader) * data.shape[-1]
                 loss.backward()
-                optimizer.step()
+                optimizer.step(burnin=epoch < self.burnin_epochs)
                 epoch_loss += loss.cpu().item()
                 #print(self.model[-1].var)
             epoch_loss /= (len(loader) * batch_size)
@@ -88,8 +88,11 @@ class SGLD(torch.optim.SGD):
         super().__init__(params, lr=lr, momentum=momentum, dampening=dampening, weight_decay=weight_decay, nesterov=nesterov)
         self.temperature = temperature
 
-    def step(self, closure=None):
+    def step(self, closure=None, burnin=False):
         loss = super().step(closure)
+
+        if burnin:
+            return loss
 
         for group in self.param_groups:
             lr = group["lr"]
@@ -109,10 +112,15 @@ class PSGLD(torch.optim.RMSprop):
         super().__init__(params, lr=lr, alpha=alpha, eps=eps, weight_decay=weight_decay, momentum=momentum, centered=centered)
         self.temperature = temperature
 
-    def step(self, closure=None):
+    def step(self, closure=None, burnin=False):
         loss = super().step(closure)
 
+        if burnin:
+            return loss
+
         for group in self.param_groups:
+            if "noise" in group and group["noise"] is False:
+                continue
             lr = group["lr"]
             eps = group["eps"]
 
@@ -124,7 +132,7 @@ class PSGLD(torch.optim.RMSprop):
 
                 square_avg = state["square_avg"]
                 avg = square_avg.sqrt().add_(eps)
-                noise = torch.normal(torch.zeros_like(p), 1)
-                p.data.addcdiv_(noise, avg.sqrt(), value=np.sqrt(2 * lr * self.temperature))
+                noise = torch.normal(torch.zeros_like(p), np.sqrt(lr * self.temperature)) / avg
+                p.data.add_(noise)
 
         return loss

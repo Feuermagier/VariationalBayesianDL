@@ -101,3 +101,12 @@ class ClassificationCalibrationResults:
         self.ece /= len(confidences)
 
         self.bin_counts = [len(bin) for bin in bins]
+
+    @property
+    def signed_ece(self):
+        sece = 0
+        for i in range(len(self.bin_counts)):
+            sece += self.bin_counts[i] * (self.bin_accuracys[i] - self.bin_confidences[i])
+        sece /= len(self.bin_counts)
+
+        return sece
