@@ -30,7 +30,7 @@ list:
 name: "SGLD"
 params:
   model: "sgld"
-  lr: 0.0001
+  lr: 0.00001
   epochs: 1100
   burnin: 100
   interval: 1
