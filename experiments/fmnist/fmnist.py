@@ -47,15 +47,15 @@ def run(device, config, out_path, log):
 
     #torch.save(trained_model.state_dict(), out_path + "model.tar")
 
-    classes = [i for i in range(10) if i not in class_exclusion]
+    classes = [i for i in range(10) if i not in class_exclusion] if class_exclusion != [] else []
     if "normal" in config["eval"]:
         testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
         acc, cal_res = exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "normal", log)
-        FMNISTResults(model, "standard", acc, cal_res).store(out_path + "results_normal.pyc")
+        FMNISTResults(model, "standard", acc, cal_res, after - before).store(out_path + "results_normal.pyc")
     if "corrupted" in config["eval"]:
         testloader = mnist.corrupted_fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
         acc, cal_res = exp.eval_model(model, trained_model, config["eval_samples"], testloader, device, out_path, "corrupted", log)
-        FMNISTResults(model, "corrupted", acc, cal_res).store(out_path + "results_corrupted.pyc")
+        FMNISTResults(model, "corrupted", acc, cal_res, after - before).store(out_path + "results_corrupted.pyc")
 
 def run_map(device, trainloader, config, model_out_path):
     layers = [

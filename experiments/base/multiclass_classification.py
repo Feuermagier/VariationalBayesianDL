@@ -52,7 +52,7 @@ def eval_model(name, model, samples, testloader, device, path, testtype, log):
     log.info(f"{testtype} Accuracy: {accuracy}")
     log.info(f"{testtype} ECE: {ece}")
 
-    return accuracy, ece, ClassificationCalibrationResults(10, errors, confidences)
+    return accuracy, ClassificationCalibrationResults(10, errors, confidences)
 
 # models = [(name, eval_fn, loss_over_time, [ece_over_time per dataset in the same order], eval_samples)]
 # datasets = [(name, dataloader)]

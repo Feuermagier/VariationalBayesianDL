@@ -61,7 +61,7 @@ def reliability_diagram(bin_count, errors, confidences, ax, include_accuracy=Tru
             transform=ax.transAxes, fontsize=16, verticalalignment="top", 
             bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})
 
-    return ece, [len(bin) for bin in static_bins], bin_errors, 
+    return ece
 
 def _create_static_bins(bin_count, confidences):
     bins = [[] for _ in range(bin_count)]
