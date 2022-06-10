@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 120
+time: 500
 sbatch_args:
   gres: "gpu:1"
 
@@ -21,9 +21,9 @@ reps_in_parallel: 1
 params:
   batch_size: 20
   data_path: "../../data/"
-  eval: ["normal", "corrupted"]
+  eval: ["normal"]
   eval_samples: 100
-  classes: []
+  classes: [7, 9]
 
 ---
 name: "MFVI"

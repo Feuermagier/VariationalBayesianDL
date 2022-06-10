@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import matplotlib
 
 def calculate_ace(bin_count, errors, confidences):
     bins = _create_adaptive_bins(bin_count, confidences)
@@ -110,3 +111,28 @@ class ClassificationCalibrationResults:
         sece /= len(self.bin_counts)
 
         return sece
+
+    def plot_reliability(self, ax, include_text=True, title=None):
+        ax.set_xlabel("Confidence", fontsize=14)
+        ax.set_ylabel("Accuracy", fontsize=14)
+        ax.plot([0, 1], [0,1], color="royalblue")
+        ax.plot(self.bin_confidences, self.bin_accuracys, "o-", color="darkorange")
+        ax.set_xlim(0, 1)
+        ax.set_xticks(self.bin_confidences)
+        ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.2f"))
+        ax.set_ylim(0, 1)
+        ax.xaxis.grid(True, linestyle="-")
+
+        count_ax = ax.twiny()
+        count_ax.set_xticklabels(self.bin_counts)
+        count_ax.set_xticks(self.bin_confidences)
+        count_ax.set_xlabel("Datapoints", fontsize=14)
+
+        if include_text:
+            if title is not None:
+                text = f"{title}\nECE: {self.ece:.3f}"
+            else:
+                text = f"ECE: {self.ece:.3f}"
+            ax.text(0.08, 0.9, text, 
+                transform=ax.transAxes, fontsize=14, verticalalignment="top", 
+                bbox={"boxstyle": "square,pad=0.5", "facecolor": "white"})

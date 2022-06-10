@@ -10,7 +10,7 @@ from training import util
 from training.calibration import ClassificationCalibrationResults, reliability_diagram
 
 
-def eval_model(name, model, samples, testloader, device, path, testtype, log):
+def eval_model(model, samples, testloader, device, testtype, log):
     torch.manual_seed(42)
 
     # Evaluate
@@ -33,26 +33,27 @@ def eval_model(name, model, samples, testloader, device, path, testtype, log):
     errors = torch.cat(errors)
     confidences = torch.cat(confidences)
     accuracy = errors.sum() / len(errors)
+    calibration = ClassificationCalibrationResults(10, errors, confidences)
 
-    # Plot loss
-    fig, ax = plt.subplots()
-    util.plot_losses(name, model.all_losses(), ax)
-    fig.set_tight_layout(True)
-    if path is not None:
-        fig.savefig(path + f"loss_{testtype}.pdf")
+    # # Plot loss
+    # fig, ax = plt.subplots()
+    # util.plot_losses(name, model.all_losses(), ax)
+    # fig.set_tight_layout(True)
+    # if path is not None:
+    #     fig.savefig(path + f"loss_{testtype}.pdf")
 
-    # Plot calibration
-    fig, ax = plt.subplots()
-    ece = reliability_diagram(10, errors, confidences, ax, include_accuracy=False, include_ace=False)
-    fig.set_tight_layout(True)
-    if path is not None:
-        fig.savefig(path + f"reliability_{testtype}.pdf")
+    # # Plot calibration
+    # fig, ax = plt.subplots()
+    # ece = reliability_diagram(10, errors, confidences, ax, include_accuracy=False, include_ace=False)
+    # fig.set_tight_layout(True)
+    # if path is not None:
+    #     fig.savefig(path + f"reliability_{testtype}.pdf")
 
     # Print results
     log.info(f"{testtype} Accuracy: {accuracy}")
-    log.info(f"{testtype} ECE: {ece}")
+    log.info(f"{testtype} ECE: {calibration.ece}")
 
-    return accuracy, ClassificationCalibrationResults(10, errors, confidences)
+    return accuracy, calibration
 
 # models = [(name, eval_fn, loss_over_time, [ece_over_time per dataset in the same order], eval_samples)]
 # datasets = [(name, dataloader)]

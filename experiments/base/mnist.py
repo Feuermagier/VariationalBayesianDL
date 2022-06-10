@@ -69,6 +69,8 @@ class CorruptedFashionMNIST(torchvision.datasets.ImageFolder):
 
 
 def corrupted_fashion_testloader(path, batch_size: int = 5, shuffle: bool = True, exclude_classes = [], flatten: bool = False) -> torch.utils.data.DataLoader:
+    if exclude_classes != []:
+        raise ValueError("Cannot select classes from the corrupted dataset")
     dataset = torchvision.datasets.ImageFolder(path + "FashionMNIST-Test(C)", gen_transform(flatten))
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
