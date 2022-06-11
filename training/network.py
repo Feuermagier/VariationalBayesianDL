@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import math
 import numpy as np
 import itertools
+from training.resnet import PreResNet
 
 from training.util import GaussLayer
 from training.bbb_layers import BBBLinear, LowRankBBBLinear, BBBConvolution
@@ -55,6 +56,9 @@ def generate_model(architecture, print_summary=False):
         elif ty == "gauss":
             std, learn_std = size
             layers.append(GaussLayer(std, learn_std))
+        elif ty == "preresnet-20":
+            in_size, in_channels, classes = size
+            layers.append(PreResNet(in_size, in_channels, classes))
         else:
             raise ValueError(f"Unknown layer type '{ty}'")
     model = nn.Sequential(*layers)
