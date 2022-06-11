@@ -20,7 +20,7 @@ def run(device, config, out_path, log):
     class_exclusion = config["classes"]
     if class_exclusion != []:
         log.info(f"Excluding classes {class_exclusion} from training")
-    trainloader = cifar.trainloader(config["data_path"], config["batch_size"], exclude_classes=class_exclusion)
+    trainloader = cifar.cifar10_trainloader(config["data_path"], config["batch_size"], exclude_classes=class_exclusion)
 
     model = config["model"]
 
@@ -53,9 +53,9 @@ def run(device, config, out_path, log):
     if "normal" in config["eval"]:
         if class_exclusion != []:
             log.info(f"Evaluating only on classes {class_exclusion}")
-        testloader = cifar.testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
+        testloader = cifar.cifar10_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
         acc, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
-        FMNISTResults(model, "standard", acc, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
+        CIFARResults(model, "standard", acc, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
     if "corrupted" in config["eval"]:
         raise NotImplementedError()
 
