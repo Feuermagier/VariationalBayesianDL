@@ -175,7 +175,7 @@ class LowRankBBBLinear(nn.Module):
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
         self.rho_init = kwargs.get("rho_init", -3)
-        self.offdiag_init = kwargs.get("offdiag_init", 0.005)
+        self.offdiag_init = kwargs.get("offdiag_init", 0)
         self.in_features, self.out_features = in_features, out_features
         self.gamma = gamma
         self.K = K
