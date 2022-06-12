@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 import numpy as np
 import itertools
-from training.resnet import PreResNet
+from training.resnet import PreResNet, DropoutPreResNet
 
 from training.util import GaussLayer
 from training.bbb_layers import BBBLinear, LowRankBBBLinear, BBBConvolution
@@ -59,6 +59,9 @@ def generate_model(architecture, print_summary=False):
         elif ty == "preresnet-20":
             in_size, in_channels, classes = size
             layers.append(PreResNet(in_size, in_channels, classes))
+        elif ty == "drop-preresnet-20":
+            in_size, in_channels, classes, p = size
+            layers.append(DropoutPreResNet(in_size, in_channels, classes, p))
         else:
             raise ValueError(f"Unknown layer type '{ty}'")
     model = nn.Sequential(*layers)

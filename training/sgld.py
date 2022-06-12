@@ -13,9 +13,10 @@ def psgld(lr, temperature=1):
     return lambda params: PSGLD(params, lr=lr, temperature=temperature)
 
 class SGLDModule(nn.Module):
-    def __init__(self, layers, burnin_epochs, sample_interval):
+    def __init__(self, layers, burnin_epochs, sample_interval, chains=1):
         super().__init__()
-        self.model = generate_model(layers)
+        self.chains = chains
+        self.layers = layers
         self.losses = []
         self.burnin_epochs = burnin_epochs
         self.sample_interval = sample_interval
@@ -23,60 +24,61 @@ class SGLDModule(nn.Module):
 
     def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
-            "model": self.model.state_dict(destination, prefix, keep_vars),
             "losses": self.losses,
             "samples": self.samples
         }
 
     def load_state_dict(self, dict):
-        self.model.load_state_dict(dict["model"])
         self.losses = dict["losses"]
         self.samples = dict["samples"]
 
     def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
-        self.model.to(device)
-        self.model.train()
-        parameters = []
-        for layer in self.model:
-            if type(layer).__name__ == "GaussLayer":
-                parameters.append({"params": layer.parameters(), "noise": False})
-            else:
-                parameters.append({"params": layer.parameters(), "noise": True})
-        optimizer = optimizer_factory(parameters)
+        for i in range(self.chains):
+            model = generate_model(self.layers)
+            if report_every_epochs >= 0:
+                print(f"Running chain {i}")
 
-        for epoch in range(epochs):
-            epoch_loss = torch.tensor(0, dtype=torch.float)
-            for data, target in loader:
-                data, target = data.to(device), target.to(device)
-                optimizer.zero_grad()
-                output = self.model(data)
-                loss = loss_fn(output, target) * len(loader) * data.shape[-1]
-                loss.backward()
-                optimizer.step(burnin=epoch < self.burnin_epochs)
-                epoch_loss += loss.cpu().item()
-                #print(self.model[-1].var)
-            epoch_loss /= (len(loader) * batch_size)
-            self.losses.append(epoch_loss.detach())
+            model.to(device)
+            model.train()
+            parameters = []
+            for layer in model:
+                if type(layer).__name__ == "GaussLayer":
+                    parameters.append({"params": layer.parameters(), "noise": False})
+                else:
+                    parameters.append({"params": layer.parameters(), "noise": True})
+            optimizer = optimizer_factory(parameters)
 
-            if epoch == self.burnin_epochs and report_every_epochs >= 0:
-                print(f"SGLD: Burnin completed in epoch {epoch}; now collecting posterior samples")
+            for epoch in range(epochs):
+                epoch_loss = torch.tensor(0, dtype=torch.float)
+                for data, target in loader:
+                    data, target = data.to(device), target.to(device)
+                    optimizer.zero_grad()
+                    output = model(data)
+                    loss = loss_fn(output, target) * len(loader) * data.shape[-1]
+                    loss.backward()
+                    optimizer.step(burnin=False)
+                    epoch_loss += loss.cpu().item()
+                    #print(self.model[-1].var)
+                epoch_loss /= (len(loader) * batch_size)
+                self.losses.append(epoch_loss.detach())
 
-            if epoch >= self.burnin_epochs and (epoch - self.burnin_epochs) % self.sample_interval == 0:
-                self.samples.append(copy.deepcopy(self.model.state_dict()))
+                if epoch == self.burnin_epochs and report_every_epochs >= 0:
+                    print(f"SGLD: Burnin completed in epoch {epoch}; now collecting posterior samples")
 
-            if report_every_epochs > 0 and epoch % report_every_epochs == 0:
-                print(f"Epoch {epoch}: loss {epoch_loss}")
-        if report_every_epochs >= 0:
-            print(f"SGLD: Collected {len(self.samples)} posterior samples")
+                if epoch >= self.burnin_epochs and (epoch - self.burnin_epochs) % self.sample_interval == 0:
+                    self.samples.append(copy.deepcopy(model.state_dict()))
+
+                if report_every_epochs > 0 and epoch % report_every_epochs == 0:
+                    print(f"Epoch {epoch}: loss {epoch_loss}")
+            if report_every_epochs >= 0:
+                print(f"SGLD: Collected {len(self.samples)} posterior samples")
 
     def infer(self, input, samples):
-        self.model.eval()
-        backup = copy.deepcopy(self.model.state_dict())
+        model = generate_model(self.layers)
         outputs = []
         for i in range(samples):
-            self.model.load_state_dict(self.samples[i % len(self.samples)])
-            outputs.append(self.model(input))
-        self.model.load_state_dict(backup)
+            model.load_state_dict(self.samples[i % len(self.samples)])
+            outputs.append(model(input))
         return torch.stack(outputs)
 
     def all_losses(self):
