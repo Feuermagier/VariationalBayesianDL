@@ -1,0 +1,6 @@
+- Majority voting vs. averaging
+- Confidence for classification: p vs (Kp-1)/(K-1) => Minimal prob 1/K by random guessing => minimal confidence should be 1/K
+- Natural Gradient (VOGN / iVON)
+- Laplace
+- MedMNIST, Retinopathy, WILDS
+- Transfor CIFAR10 -> STL10

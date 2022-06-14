@@ -48,6 +48,7 @@ class SGLDModule(nn.Module):
                     parameters.append({"params": layer.parameters(), "noise": True})
             optimizer = optimizer_factory(parameters)
 
+            losses = []
             for epoch in range(epochs):
                 epoch_loss = torch.tensor(0, dtype=torch.float)
                 for data, target in loader:
@@ -60,7 +61,7 @@ class SGLDModule(nn.Module):
                     epoch_loss += loss.cpu().item()
                     #print(self.model[-1].var)
                 epoch_loss /= (len(loader) * batch_size)
-                self.losses.append(epoch_loss.detach())
+                losses.append(epoch_loss.detach())
 
                 if epoch == self.burnin_epochs and report_every_epochs >= 0:
                     print(f"SGLD: Burnin completed in epoch {epoch}; now collecting posterior samples")
@@ -72,6 +73,7 @@ class SGLDModule(nn.Module):
                     print(f"Epoch {epoch}: loss {epoch_loss}")
             if report_every_epochs >= 0:
                 print(f"SGLD: Collected {len(self.samples)} posterior samples")
+            self.losses.append(losses)
 
     def infer(self, input, samples):
         model = generate_model(self.layers)
@@ -82,7 +84,7 @@ class SGLDModule(nn.Module):
         return torch.stack(outputs)
 
     def all_losses(self):
-        return [self.losses]
+        return self.losses
 
 # Inspired by https://github.com/alisiahkoohi/Langevin-dynamics/blob/master/langevin_sampling/SGLD.py
 class SGLD(torch.optim.SGD):
@@ -134,7 +136,7 @@ class PSGLD(torch.optim.RMSprop):
 
                 square_avg = state["square_avg"]
                 avg = square_avg.sqrt().add_(eps)
-                noise = torch.normal(torch.zeros_like(p), np.sqrt(lr * self.temperature)) / avg
+                noise = torch.normal(torch.zeros_like(p), self.temperature * np.sqrt(lr)) / avg
                 p.data.add_(noise)
 
         return loss

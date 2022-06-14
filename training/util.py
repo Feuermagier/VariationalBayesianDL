@@ -9,8 +9,8 @@ def gauss_logprob(mean: torch.Tensor, variance: torch.Tensor, x: torch.Tensor) -
     #var = torch.max(torch.tensor(1e-6), variance)
     return -((x - mean) ** 2) / (2 * variance) - torch.log(variance.sqrt()) - math.log(math.sqrt(2 * math.pi))
 
-def sgd(lr):
-    return lambda parameters: torch.optim.SGD(parameters, lr=lr)
+def sgd(lr, momentum=0):
+    return lambda parameters: torch.optim.SGD(parameters, lr=lr, momentum=momentum)
 
 def adam(lr):
     return lambda parameters: torch.optim.Adam(parameters, lr=lr)

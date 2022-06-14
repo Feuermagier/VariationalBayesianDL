@@ -19,6 +19,10 @@ DATA_PATH = "./data/"
 random.seed(0)
 torch.manual_seed(0)
 
+# Download CIFAR10
+torchvision.datasets.CIFAR10(root=DATA_PATH, train=False, download=True)
+torchvision.datasets.CIFAR10(root=DATA_PATH, train=True, download=True)
+
 # Download FashionMNIST test and train splits if not already present
 torchvision.datasets.FashionMNIST(root=DATA_PATH, train=False, download=True)
 torchvision.datasets.FashionMNIST(root=DATA_PATH, train=True, download=True)

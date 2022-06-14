@@ -43,7 +43,7 @@ def store_results(dataset, testset, models, device, min=-0.3, max=0.8, plot_grou
         result = RegressionResults(testloader, name, model.infer, samples, device, target_mean=dataset.y_mean, target_std = dataset.y_std)
         fig, ax = plt.subplots(1, 1)
         ax.set_ylim(-0.9, 1.3)
-        dataset.plot_predictions(min, max, model.infer, samples, ax, dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth)
+        dataset.plot_predictions(min, max, model.infer, samples, ax, dataset=None, alpha = 0.1 if samples > 10 else 1, plot_ground_truth=plot_ground_truth, plot_confidence_intervals=False)
         fig.tight_layout(pad=0)
         fig.savefig(f"results/toy/regression/{name}_plot.pdf")
 

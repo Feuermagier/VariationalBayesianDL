@@ -83,12 +83,12 @@ def plot_table(title, results, filename=None):
     mean_mses = torch.tensor([[res.mean_mse for res in reses] for reses in results])
     mse_of_means = torch.tensor([[res.mse_of_means for res in reses] for reses in results])
     qces = torch.tensor([[res.qce for res in reses] for reses in results])
-    divisior = math.sqrt(average_lmls.shape[1])
+    divisor = math.sqrt(average_lmls.shape[1])
     texts = [[results[i][0].name, 
-            f"{average_lmls[i].mean():.2f} ± {(average_lmls[i].std() / divisior):.2f}", 
-            f"{mean_mses[i].mean():.3f} ± {(mean_mses[i].std() / divisior):.3f}", 
-            f"{mse_of_means[i].mean():.3f} ± {(mse_of_means[i].std() / divisior):.3f}", 
-            f"{qces[i].mean():.2f} ± {(qces[i].std() / divisior):.2f}"]
+            f"{average_lmls[i].mean():.2f} ± {(average_lmls[i].std() / divisor):.2f}", 
+            f"{mean_mses[i].mean():.3f} ± {(mean_mses[i].std() / divisor):.3f}", 
+            f"{mse_of_means[i].mean():.3f} ± {(mse_of_means[i].std() / divisor):.3f}", 
+            f"{qces[i].mean():.2f} ± {(qces[i].std() / divisor):.2f}"]
         for i in range(len(results))]
     cols = (title, "Avg LML", "Mean MSE", "MSE of Means", "QCE")
     table = tabulate(texts, headers=cols, tablefmt='orgtbl')
@@ -100,6 +100,16 @@ def plot_table(title, results, filename=None):
 
     plt.plot(average_lmls.mean(dim=1))
     plt.xticks(torch.arange(1, len(results) + 1, 1))
+
+    for result, lml, mean_mse, mse, qce in zip(results, average_lmls, mean_mses, mse_of_means, qces):
+        print((
+            f"{result[0].name}"
+            f" & ${lml.mean():.2f} \\pm {(lml.std() / divisor):.2f}$"
+            f" & ${mean_mse.mean():.2f} \\pm {(mean_mse.std() / divisor):.2f}$"
+            f" & ${mse.mean():.2f} \\pm {(mse.std() / divisor):.2f}$"
+            f" & ${qce.mean():.2f} \\pm {(qce.std() / divisor):.2f}$"
+            " \\\\"
+        ))
 
 def normalize(x, data_mean, data_std):
     return (x - data_mean) / data_std

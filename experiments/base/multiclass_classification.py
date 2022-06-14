@@ -10,7 +10,7 @@ from training import util
 from training.calibration import ClassificationCalibrationResults, reliability_diagram
 
 
-def eval_model(model, samples, testloader, device, testtype, log):
+def eval_model(model, samples, testloader, device, testtype="", log=None):
     torch.manual_seed(42)
 
     # Evaluate
@@ -50,8 +50,12 @@ def eval_model(model, samples, testloader, device, testtype, log):
     #     fig.savefig(path + f"reliability_{testtype}.pdf")
 
     # Print results
-    log.info(f"{testtype} Accuracy: {accuracy}")
-    log.info(f"{testtype} ECE: {calibration.ece}")
+    if log is not None:
+        log.info(f"{testtype} Accuracy: {accuracy}")
+        log.info(f"{testtype} ECE: {calibration.ece}")
+    else:
+        print(f"{testtype} Accuracy: {accuracy}")
+        print(f"{testtype} ECE: {calibration.ece}")
 
     return accuracy, calibration
 
