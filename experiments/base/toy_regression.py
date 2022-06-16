@@ -29,9 +29,9 @@ def plot_grid(dataset, testset, models, device, min=-0.3, max=0.8, plot_ground_t
 
     return fig, results
 
-def gap_datasets(device):
+def gap_datasets(device, batch_size=20):
     dataset = toy.TrigonometricToyDataset([(0, 0.13, 100), (0.4, 0.55, 100)], NOISE)
-    trainloader = torch.utils.data.DataLoader(dataset.trainset, batch_size=20)
+    trainloader = torch.utils.data.DataLoader(dataset.trainset, batch_size=batch_size)
     testset = dataset.generate_testset(0.0, 0.55, 500, NOISE)
     #testloader = torch.utils.data.DataLoader(testset, batch_size=testset.tensors[0].shape[0])
 

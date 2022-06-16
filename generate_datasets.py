@@ -5,6 +5,7 @@ from PIL import Image
 from pathlib import Path
 import urllib.request
 import zipfile
+import sys
 
 # Python-Fu to import from mnist-c which has a dash in it
 import importlib
@@ -13,7 +14,8 @@ os.chdir("./mnist-c/")
 mnist_c = importlib.import_module("mnist-c.corruptions")
 os.chdir("..")
 
-DATA_PATH = "./data/"
+DATA_PATH = "./data/" if len(sys.argv) <= 1 else sys.argv[1]
+print(f"Creating datasets in {DATA_PATH}")
 
 # Don't change this for reproducible results!!!
 random.seed(0)

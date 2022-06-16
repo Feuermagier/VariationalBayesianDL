@@ -15,10 +15,15 @@ def sgd(lr, momentum=0):
 def adam(lr):
     return lambda parameters: torch.optim.Adam(parameters, lr=lr)
 
-def nll_loss(output, target, reduction="mean"):
+def nll_loss(output, target, eps: float = 1e-6,):
     mean = output[...,0]
-    std = output[...,1]
-    return F.gaussian_nll_loss(mean, target, std**2, reduction)
+    var = output[...,1]**2
+    with torch.no_grad():
+        var = var.clamp(min=eps)
+    #return F.gaussian_nll_loss(mean, target, std**2, reduction)
+    # Custom implementation without any() to support functorch
+    loss = 0.5 * (torch.log(var) + (mean - target)**2 / var)
+    return loss.mean()
 
 # Weighted sum of two gaussian distributions
 class GaussianMixture:

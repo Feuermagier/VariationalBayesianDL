@@ -67,7 +67,7 @@ class SwagModel(nn.Module):
                 optimizer.step()
                 epoch_loss += loss.cpu().item()
                 self.swag_update(epoch, batch_idx, optimizer)
-            epoch_loss /= (len(loader) * batch_size)
+            epoch_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")

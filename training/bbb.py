@@ -14,6 +14,8 @@ class BBBModel(nn.Module):
 
         self.model = generate_model(layers)
         self.losses = []
+        self.data_losses = []
+        self.kl_losses = []
 
     def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
@@ -34,7 +36,9 @@ class BBBModel(nn.Module):
         # kl_grads = []
         # data_grads = []
         for epoch in range(epochs):
-            epoch_loss = torch.tensor(0, dtype=torch.float)
+            epoch_loss = torch.tensor(0.0)
+            epoch_kl_loss = torch.tensor(0.0)
+            epoch_data_loss = torch.tensor(0.0)
             for data, target in loader:
                 data, target = data.to(device), target.to(device)
                 optimizer.zero_grad()
@@ -62,8 +66,14 @@ class BBBModel(nn.Module):
                 #nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
                 optimizer.step()
                 epoch_loss += loss.cpu().item()
-            epoch_loss /= (len(loader) * batch_size)
+                epoch_kl_loss += (pi * kl_loss).cpu().detach() / mc_samples
+                epoch_data_loss += (data_loss).cpu().detach() / mc_samples
+            epoch_loss /= len(loader)
+            epoch_kl_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
+            self.kl_losses.append(epoch_kl_loss.detach() / mc_samples)
+            self.data_losses.append(epoch_data_loss.detach() / mc_samples)
+
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")
         if report_every_epochs >= 0:

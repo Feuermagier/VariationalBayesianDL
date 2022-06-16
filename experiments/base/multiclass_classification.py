@@ -117,6 +117,5 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
 def _analyze_output(output, target):
     preds = torch.argmax(output, dim=1)
     errors = preds == target
-    classes = target.shape[-1]
-    confidences = torch.clamp((output[torch.arange(output.shape[0]), preds].exp() * classes - 1) / (classes - 1), 0, 1)
+    confidences = torch.clamp(output[torch.arange(output.shape[0]), preds].exp(), 0, 1)
     return errors, confidences
