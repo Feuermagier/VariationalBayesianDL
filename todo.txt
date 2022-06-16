@@ -4,3 +4,5 @@
 - Laplace
 - MedMNIST, Retinopathy, WILDS
 - Transfor CIFAR10 -> STL10
+- Increasing #ensembles for vanilla vs RMS => RMS should profit more
+- KL loss vs data loss for BBB for different temperatures

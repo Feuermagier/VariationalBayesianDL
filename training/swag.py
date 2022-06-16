@@ -12,7 +12,9 @@ class SwagModel(nn.Module):
         self.model = generate_model(layers)
         self.losses = []
         self.update_every_batches = config.get("update_every_batches", -1)
+        self.mean_samples = config.get("mean_samples", 10)
         self.deviation_samples = config.get("deviation_samples", 10)
+        assert self.mean_samples >= self.deviation_samples
         self.start_epoch = config.get("start_epoch", 0)
         self.use_lr_cycles = config.get("use_lr_cycles", False)
         self.max_lr = config.get("max_lr", 0.005)
@@ -54,7 +56,7 @@ class SwagModel(nn.Module):
         optimizer = optimizer_factory(self.model.parameters())
 
         if self.update_every_batches == -1:
-            self.update_every_batches = np.ceil(len(loader) * (epochs - self.start_epoch) / self.deviation_samples)
+            self.update_every_batches = np.ceil(len(loader) * (epochs - self.start_epoch) / self.mean_samples)
 
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)

@@ -19,8 +19,9 @@ def vogn_init(parameters, N, init):
         state["tempering"] = init["tempering"] if "tempering" in init else 1
         state["augmentation"] = init["augmentation"] if "augmentation" in init else 1
         state["bias_correction"] = init["bias_correction"] if "bias_correction" in init else False
+        state["sample"] = init["sample"] if "sample" in init else True # Set this to False to use OGN
 
-        state["N"] = N * state["augmentation"]
+        state["N"] = N
         state["momentum"] = torch.zeros_like(param, device=param.device)
         state["scale"] = None
         state["step"] = 0
@@ -31,8 +32,9 @@ def vogn_init(parameters, N, init):
 def vogn_prepare(parameters, states):
     perturbed_params = []
     for param, state in zip(parameters, states):
-        if state["scale"] is not None:
-            std = (1 / (state["N"] * state["scale"])).sqrt()
+        if state["scale"] is not None and state["sample"] is True:
+            delta = state["augmentation"] * state["prior_prec"] / state["N"]
+            std = (1 / (delta + state["scale"] + state["damping"]) / state["N"]).sqrt()
             epsilon = torch.randn_like(param, device=param.device)
             perturbed_params.append(param + epsilon * std)
         else:
@@ -46,7 +48,7 @@ def vogn_step(parameters, grads, states):
             state["step"] += 1
             t = state["step"]
             beta1, beta2 = state["betas"]
-            delta = state["prior_prec"] / state["N"]
+            delta = state["augmentation"] * state["prior_prec"] / state["N"]
 
             grad = grad.mean(dim=0)
             avg_grad = grad.mean(dim=0)
@@ -56,9 +58,9 @@ def vogn_step(parameters, grads, states):
                 state["scale"] = sq_grad + delta + state["damping"] # We treat the first batch as our initialization batch
                 new_parameters.append(param)
             else:
-                state["momentum"] = beta1 * state["momentum"] + (1 - beta1) * (avg_grad + delta * param)
-                state["scale"] = beta2 * state["scale"] + (1 - beta2) * (sq_grad + delta)
-                update = state["lr"] * state["momentum"] / (state["scale"] + state["damping"])
+                state["momentum"] = (1 - beta1) * state["momentum"] + (avg_grad + delta * param)
+                state["scale"] = (1 - state["tempering"] * beta2) * state["scale"] + beta2 * sq_grad
+                update = state["lr"] * state["momentum"] / (state["scale"] + state["damping"] + delta)
                 if state["bias_correction"]:
                     update *= (1 - beta2**t) / (1 - beta1**t)
                 new_parameters.append(param - update)
@@ -67,7 +69,8 @@ def vogn_step(parameters, grads, states):
 def vogn_stds(states):
     stds = []
     for state in states:
-        stds.append((1 / (state["N"] * (state["scale"] + state["damping"]))).sqrt())
+        delta = state["augmentation"] * state["prior_prec"] / state["N"]
+        stds.append((1 / (delta + state["scale"] + state["damping"]) / state["N"]).sqrt())
     return stds
 
 
@@ -120,7 +123,7 @@ class VOGNModule(nn.Module):
                 self.params, self.optim_state = vogn_step(self.params, grads, self.optim_state)
                 
                 epoch_loss += loss.cpu().item()
-            epoch_loss /= (len(loader) * batch_size)
+            epoch_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
 
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
