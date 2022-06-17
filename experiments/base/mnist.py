@@ -4,6 +4,7 @@ import torchvision
 from torchvision.transforms import transforms
 import matplotlib.pyplot as plt
 import random
+import medmnist
 
 # Python-Fu to import from mnist-c which has a dash in it
 # import importlib
@@ -72,6 +73,40 @@ def corrupted_fashion_testloader(path, batch_size: int = 5, shuffle: bool = True
     if exclude_classes != []:
         raise ValueError("Cannot select classes from the corrupted dataset")
     dataset = torchvision.datasets.ImageFolder(path + "FashionMNIST-Test(C)", gen_transform(flatten))
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
+
+medmnist_classes = {
+    "path": 9,
+    "derma": 7,
+    "oct": 4,
+    "pneumonia": 2,
+    "breast": 2,
+    "blood": 8,
+    "tissue": 8,
+    "organA": 11,
+    "organC": 11,
+    "organS": 11
+}
+
+medmnist_datasets = {
+    "path": medmnist.PathMNIST,
+    "derma": medmnist.DermaMNIST,
+    "oct": medmnist.OCTMNIST,
+    "pneumonia": medmnist.PneumoniaMNIST,
+    "breast": medmnist.BreastMNIST,
+    "blood": medmnist.BloodMNIST,
+    "tissue": medmnist.TissueMNIST,
+    "organA": medmnist.OrganAMNIST,
+    "organC": medmnist.OrganCMNIST,
+    "organS": medmnist.OrganSMNIST
+}
+
+def medmnist_trainloader(path, dataset, batch_size: int, shuffle: bool =True, exclude_classes=[]) -> torch.utils.data.DataLoader:
+    dataset = medmnist_datasets[dataset](split="train", download=True, transform=gen_transform(False), target_transform=transforms.Lambda(lambda target: target.squeeze(-1)))
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
+
+def medmnist_testloader(path, dataset, batch_size: int, shuffle: bool =True, exclude_classes=[]) -> torch.utils.data.DataLoader:
+    dataset = medmnist_datasets[dataset](split="test", download=True, transform=gen_transform(False), target_transform=transforms.Lambda(lambda target: target.squeeze(-1)))
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
 

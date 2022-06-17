@@ -12,8 +12,8 @@ def gauss_logprob(mean: torch.Tensor, variance: torch.Tensor, x: torch.Tensor) -
 def sgd(lr, momentum=0, weight_decay=0):
     return lambda parameters: torch.optim.SGD(parameters, lr=lr, momentum=momentum, weight_decay=weight_decay)
 
-def adam(lr):
-    return lambda parameters: torch.optim.Adam(parameters, lr=lr)
+def adam(lr, weight_decay=0):
+    return lambda parameters: torch.optim.Adam(parameters, lr=lr, weight_decay=weight_decay)
 
 def nll_loss(output, target, eps: float = 1e-6,):
     mean = output[...,0]

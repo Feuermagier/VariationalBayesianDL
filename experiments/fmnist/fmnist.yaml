@@ -26,68 +26,68 @@ params:
   classes: []
   weight_decay: 0
 
----
-name: "MAP"
-params:
-  model: "map"
-  lr: 0.1
-  epochs: 30
-  weight_decay: 0.0001
+# ---
+# name: "MAP"
+# params:
+#   model: "map"
+#   lr: 0.1
+#   epochs: 30
+#   weight_decay: 0.0001
 
----
-name: "Ensemble-5"
-params:
-  model: "ensemble"
-  members: 5
-  lr: 0.1
-  weight_decay: 0.0001
-  epochs: 30
+# ---
+# name: "Ensemble-5"
+# params:
+#   model: "ensemble"
+#   members: 5
+#   lr: 0.1
+#   weight_decay: 0.0001
+#   epochs: 30
 
----
-name: "SWAG"
-params:
-  model: "swag"
-  swag_config:
-    mean_samples: 30
-    deviation_samples: 30
-    start_epoch: 25
-  lr: 0.1
-  weight_decay: 0.0001
-  epochs: 30
+# ---
+# name: "SWAG"
+# params:
+#   model: "swag"
+#   swag_config:
+#     mean_samples: 30
+#     deviation_samples: 30
+#     start_epoch: 25
+#   lr: 0.1
+#   weight_decay: 0.0001
+#   epochs: 30
 
----
-name: "MultiSWAG"
-params:
-  model: "multi_swag"
-  members: 5
-  swag_config:
-    mean_samples: 30
-    deviation_samples: 30
-    start_epoch: 25
-  lr: 0.1
-  weight_decay: 0.0001
-  epochs: 30
+# ---
+# name: "MultiSWAG"
+# params:
+#   model: "multi_swag"
+#   members: 5
+#   swag_config:
+#     mean_samples: 30
+#     deviation_samples: 30
+#     start_epoch: 25
+#   lr: 0.1
+#   weight_decay: 0.0001
+#   epochs: 30
 
----
-name: "MCDropout"
-params:
-  model: "mc_dropout"
-  p: 0.2
-  lr: 0.1
-  weight_decay: 0.0001
-  epochs: 40
-  mc_samples: 1
+# ---
+# name: "MCDropout"
+# params:
+#   model: "mc_dropout"
+#   p: 0.2
+#   lr: 0.1
+#   weight_decay: 0.0001
+#   epochs: 40
+#   mc_samples: 1
 
----
-name: "MultiMCDropout"
-params:
-  model: "multi_mc_dropout"
-  members: 5
-  p: 0.2
-  lr: 0.1
-  weight_decay: 0.0001
-  epochs: 40
-  mc_samples: 1
+# ---
+# name: "MultiMCDropout"
+# params:
+#   model: "multi_mc_dropout"
+#   members: 5
+#   p: 0.2
+#   lr: 0.1
+#   weight_decay: 0.0001
+#   epochs: 40
+#   mc_samples: 1
 
 ---
 name: "VOGN"
@@ -99,6 +99,7 @@ params:
     damping: 0.001
     sample: True
   mc_samples: 2
+  epochs: 30
 
 ---
 name: "MultiVOGN"
@@ -111,3 +112,4 @@ params:
     damping: 0.001
     sample: True
   mc_samples: 2
+  epochs: 30
