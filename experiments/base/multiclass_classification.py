@@ -16,12 +16,14 @@ def eval_model(model, samples, testloader, device, testtype="", log=None):
     # Evaluate
     errors = []
     confidences = []
+    log_likelihoods = []
     with torch.no_grad():
         for data, target in testloader:
             output = model.infer(data.to(device), samples).mean(dim=0).cpu()
-            err, conf = _analyze_output(output, target)
+            err, conf, ll = _analyze_output(output, target)
             errors.append(err)
             confidences.append(conf)
+            log_likelihoods.append(ll)
             # outputs = eval_fn(data.to(device), samples).cpu()
             # sample_preds = torch.transpose(
             #     torch.argmax(outputs, dim=2), 0, 1)
@@ -33,6 +35,8 @@ def eval_model(model, samples, testloader, device, testtype="", log=None):
     errors = torch.cat(errors)
     confidences = torch.cat(confidences)
     accuracy = errors.sum() / len(errors)
+    avg_log_likelihood = torch.cat(log_likelihoods).mean()
+    avg_likelihood = torch.cat(log_likelihoods).exp().mean()
     calibration = ClassificationCalibrationResults(10, errors, confidences)
 
     # # Plot loss
@@ -52,12 +56,16 @@ def eval_model(model, samples, testloader, device, testtype="", log=None):
     # Print results
     if log is not None:
         log.info(f"{testtype} Accuracy: {accuracy}")
+        log.info(f"{testtype} Avg Log Likelihood: {avg_log_likelihood}")
+        log.info(f"{testtype} Avg Likelihood: {avg_likelihood}")
         log.info(f"{testtype} ECE: {calibration.ece}")
     else:
         print(f"{testtype} Accuracy: {accuracy}")
+        print(f"{testtype} Avg Log Likelihood: {avg_log_likelihood}")
+        print(f"{testtype} Avg Likelihood: {avg_likelihood}")
         print(f"{testtype} ECE: {calibration.ece}")
 
-    return accuracy, calibration
+    return accuracy, avg_log_likelihood, avg_likelihood, calibration
 
 # models = [(name, eval_fn, loss_over_time, [ece_over_time per dataset in the same order], eval_samples)]
 # datasets = [(name, dataloader)]
@@ -117,5 +125,6 @@ def eval_multiple(models, datasets, device, include_ace=True, include_mce=False)
 def _analyze_output(output, target):
     preds = torch.argmax(output, dim=1)
     errors = preds == target
-    confidences = torch.clamp(output[torch.arange(output.shape[0]), preds].exp(), 0, 1)
-    return errors, confidences
+    confidences = torch.clamp(torch.max(output, dim=1)[0].exp(), 0, 1)
+    ll = output[torch.arange(output.shape[0]), target]
+    return errors, confidences, ll

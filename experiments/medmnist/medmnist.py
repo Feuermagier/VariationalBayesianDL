@@ -59,12 +59,12 @@ def run(device, config, out_path, log):
         if class_exclusion != []:
             log.info(f"Evaluating only on classes {class_exclusion}")
         testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
-        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
-        FMNISTResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
+        acc, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
+        FMNISTResults(model, "standard", acc, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
     if "corrupted" in config["eval"]:
         testloader = mnist.corrupted_fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
-        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "corrupted", log)
-        FMNISTResults(model, "corrupted", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_corrupted.pyc")
+        acc, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "corrupted", log)
+        FMNISTResults(model, "corrupted", acc, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_corrupted.pyc")
 
 def run_map(device, trainloader, config):
     layers = [

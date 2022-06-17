@@ -3,13 +3,11 @@ import pickle
 from training.calibration import ClassificationCalibrationResults
 
 
-class FMNISTResults:
-    def __init__(self, method, dataset, accuracy, log_likelihood, likelihood, calibration_results: ClassificationCalibrationResults, time, losses):
+class MedMNISTResults:
+    def __init__(self, method, dataset, accuracy, calibration_results: ClassificationCalibrationResults, time, losses):
         self.method = method
         self.dataset = dataset
         self.accuracy = accuracy
-        self.log_likelihood = log_likelihood
-        self.likelihood = likelihood
         self.time = time
         self.calibration_results = calibration_results
         self.losses = losses
