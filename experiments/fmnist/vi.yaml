@@ -24,6 +24,7 @@ params:
   eval: ["normal"]
   eval_samples: 100
   classes: [7, 9]
+  weight_decay: 0
 
 ---
 name: "MFVI"

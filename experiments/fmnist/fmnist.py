@@ -15,6 +15,7 @@ from training.pp import MAP
 from training.ensemble import Ensemble
 from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
+from training.vogn import VOGNModule
 
 def run(device, config, out_path, log):
     class_exclusion = config["classes"]
@@ -41,6 +42,10 @@ def run(device, config, out_path, log):
         trained_model = run_mfvi(device, trainloader, config)
     elif model == "multi_mfvi":
         trained_model = run_multi_mfvi(device, trainloader, config)
+    elif model == "vogn":
+        trained_model = run_vogn(device, trainloader, config)
+    elif model == "multi_vogn":
+        trained_model = run_multi_vogn(device, trainloader, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -79,7 +84,7 @@ def run_map(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 def run_ensemble(device, trainloader, config):
@@ -101,7 +106,7 @@ def run_ensemble(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 def run_swag(device, trainloader, config):
@@ -124,7 +129,7 @@ def run_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 def run_multi_swag(device, trainloader, config):
@@ -148,16 +153,18 @@ def run_multi_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 def run_mc_dropout(device, trainloader, config):
     p = config["p"]
     layers = [
         ("conv", (1, 6, 5)),
+        ("dropout", (p,)),
         ("relu", ()),
         ("pool", 2),
         ("conv", (6, 16, 5)),
+        ("dropout", (p,)),
         ("relu", ()),
         ("pool", 2),
         ("flatten", ()),
@@ -172,7 +179,7 @@ def run_mc_dropout(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
 def run_multi_mc_dropout(device, trainloader, config):
@@ -180,9 +187,11 @@ def run_multi_mc_dropout(device, trainloader, config):
     p = config["p"]
     layers = [
         ("conv", (1, 6, 5)),
+        ("dropout", (p,)),
         ("relu", ()),
         ("pool", 2),
         ("conv", (6, 16, 5)),
+        ("dropout", (p,)),
         ("relu", ()),
         ("pool", 2),
         ("flatten", ()),
@@ -197,7 +206,7 @@ def run_multi_mc_dropout(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
 def run_mfvi(device, trainloader, config):
@@ -219,7 +228,7 @@ def run_mfvi(device, trainloader, config):
     ]
 
     model = BBBModel(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
 def run_multi_mfvi(device, trainloader, config):
@@ -242,7 +251,50 @@ def run_multi_mfvi(device, trainloader, config):
     ]
 
     model = Ensemble([BBBModel(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    return model
+
+def run_vogn(device, trainloader, config):
+    layers = [
+        ("conv", (1, 6, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("conv", (6, 16, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("flatten", ()),
+        ("fc", (16 * 4 * 4, 120)),
+        ("relu", ()),
+        ("fc", (120, 84)),
+        ("relu", ()),
+        ("fc", (84, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = VOGNModule(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    return model
+
+def run_multi_vogn(device, trainloader, config):
+    members = config["members"]
+    layers = [
+        ("conv", (1, 6, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("conv", (6, 16, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("flatten", ()),
+        ("fc", (16 * 4 * 4, 120)),
+        ("relu", ()),
+        ("fc", (120, 84)),
+        ("relu", ()),
+        ("fc", (84, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([VOGNModule(layers) for _ in range(members)])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################

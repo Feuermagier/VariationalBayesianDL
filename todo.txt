@@ -6,3 +6,4 @@
 - Transfor CIFAR10 -> STL10
 - Increasing #ensembles for vanilla vs RMS => RMS should profit more
 - KL loss vs data loss for BBB for different temperatures
+- MCD: Dropout after convolutions? Sensitivity to dropout rate?

@@ -58,7 +58,7 @@ def vogn_step(parameters, grads, states):
                 state["scale"] = sq_grad + delta + state["damping"] # We treat the first batch as our initialization batch
                 new_parameters.append(param)
             else:
-                state["momentum"] = (1 - beta1) * state["momentum"] + (avg_grad + delta * param)
+                state["momentum"] = beta1 * state["momentum"] + (1 - beta1) * (avg_grad + delta * param)
                 state["scale"] = (1 - state["tempering"] * beta2) * state["scale"] + beta2 * sq_grad
                 update = state["lr"] * state["momentum"] / (state["scale"] + state["damping"] + delta)
                 if state["bias_correction"]:
