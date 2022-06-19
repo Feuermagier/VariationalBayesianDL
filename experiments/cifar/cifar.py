@@ -54,8 +54,8 @@ def run(device, config, out_path, log):
         if class_exclusion != []:
             log.info(f"Evaluating only on classes {class_exclusion}")
         testloader = cifar.cifar10_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
-        acc, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
-        CIFARResults(model, "standard", acc, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
+        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
+        CIFARResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
     if "corrupted" in config["eval"]:
         raise NotImplementedError()
 
@@ -105,99 +105,7 @@ def run_multi_swag(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
-def run_mc_dropout(device, trainloader, config):
-    p = config["p"]
-    layers = [
-        ("conv", (1, 6, 5)),
-        ("relu", ()),
-        ("pool", 2),
-        ("conv", (6, 16, 5)),
-        ("relu", ()),
-        ("pool", 2),
-        ("flatten", ()),
-        ("fc", (16 * 4 * 4, 120)),
-        ("dropout", (p,)),
-        ("relu", ()),
-        ("fc", (120, 84)),
-        ("dropout", (p,)),
-        ("relu", ()),
-        ("fc", (84, 10)),
-        ("logsoftmax", ())
-    ]
 
-    model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    return model
-
-def run_multi_mc_dropout(device, trainloader, config):
-    members = config["members"]
-    p = config["p"]
-    layers = [
-        ("conv", (1, 6, 5)),
-        ("relu", ()),
-        ("pool", 2),
-        ("conv", (6, 16, 5)),
-        ("relu", ()),
-        ("pool", 2),
-        ("flatten", ()),
-        ("fc", (16 * 4 * 4, 120)),
-        ("dropout", (p,)),
-        ("relu", ()),
-        ("fc", (120, 84)),
-        ("dropout", (p,)),
-        ("relu", ()),
-        ("fc", (84, 10)),
-        ("logsoftmax", ())
-    ]
-
-    model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
-    return model
-
-def run_mfvi(device, trainloader, config):
-    prior = GaussianPrior(0, 1)
-    layers = [
-        ("v_conv", (1, 6, 5, prior, {})),
-        ("relu", ()),
-        ("pool", 2),
-        ("v_conv", (6, 16, 5, prior, {})),
-        ("relu", ()),
-        ("pool", 2),
-        ("flatten", ()),
-        ("v_fc", (16 * 4 * 4, 120, prior, {})),
-        ("relu", ()),
-        ("v_fc", (120, 84, prior, {})),
-        ("relu", ()),
-        ("v_fc", (84, 10, prior, {})),
-        ("logsoftmax", ())
-    ]
-
-    model = BBBModel(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    return model
-
-def run_multi_mfvi(device, trainloader, config):
-    members = config["members"]
-    prior = GaussianPrior(0, 1)
-    layers = [
-        ("v_conv", (1, 6, 5, prior, {})),
-        ("relu", ()),
-        ("pool", 2),
-        ("v_conv", (6, 16, 5, prior, {})),
-        ("relu", ()),
-        ("pool", 2),
-        ("flatten", ()),
-        ("v_fc", (16 * 4 * 4, 120, prior, {})),
-        ("relu", ()),
-        ("v_fc", (120, 84, prior, {})),
-        ("relu", ()),
-        ("v_fc", (84, 10, prior, {})),
-        ("logsoftmax", ())
-    ]
-
-    model = Ensemble([BBBModel(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    return model
 
 ####################### CW2 #####################################
 class FashionMNISTExperiment(experiment.AbstractExperiment):

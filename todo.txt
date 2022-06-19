@@ -1,9 +1,7 @@
-- Majority voting vs. averaging
-- Confidence for classification: p vs (Kp-1)/(K-1) => Minimal prob 1/K by random guessing => minimal confidence should be 1/K
 - Natural Gradient (VOGN / iVON)
 - Laplace
 - MedMNIST, Retinopathy, WILDS
-- Transfor CIFAR10 -> STL10
+- Transfer CIFAR10 -> STL10
 - Increasing #ensembles for vanilla vs RMS => RMS should profit more
 - KL loss vs data loss for BBB for different temperatures
 - MCD: Dropout after convolutions? Sensitivity to dropout rate?

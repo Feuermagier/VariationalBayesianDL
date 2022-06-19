@@ -7,10 +7,10 @@ class PreBasicBlock(nn.Module):
         super().__init__()
 
         self.main_path = nn.Sequential(
-            nn.BatchNorm2d(in_channels),
+            nn.GroupNorm(num_groups=16, num_channels=in_channels),
             nn.ReLU(),
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(num_groups=16, num_channels=out_channels),
             nn.ReLU(),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
         )
@@ -39,12 +39,12 @@ class PreResNet(nn.Module):
             PreBasicBlock(32, 64, 2),
             PreBasicBlock(64, 64, 1),
 
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(num_groups=64, num_channels=64),
             nn.ReLU(),
-            nn.AvgPool2d(8),
+            nn.AvgPool2d(8) if in_size >= 32 else nn.Identity(),
 
             nn.Flatten(),
-            nn.Linear(64 * (in_size // 32)**2, classes)
+            nn.Linear(64 * (in_size // (32 if in_size >= 32 else 4))**2, classes)
         )
 
     def forward(self, input):
@@ -55,11 +55,11 @@ class DropoutPreBasicBlock(nn.Module):
         super().__init__()
 
         self.main_path = nn.Sequential(
-            nn.BatchNorm2d(in_channels),
+            nn.GroupNorm(num_groups=16, num_channels=in_channels),
             nn.ReLU(),
             FixableDropout(p),
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(num_groups=16, num_channels=out_channels),
             nn.ReLU(),
             FixableDropout(p),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
@@ -92,13 +92,13 @@ class DropoutPreResNet(nn.Module):
             DropoutPreBasicBlock(32, 64, p, 2),
             DropoutPreBasicBlock(64, 64, p, 1),
 
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(num_groups=64, num_channels=64),
             nn.ReLU(),
-            nn.AvgPool2d(8),
+            nn.AvgPool2d(8) if in_size >= 32 else nn.Identity(),
 
             nn.Flatten(),
             FixableDropout(p),
-            nn.Linear(64 * (in_size // 32)**2, classes)
+            nn.Linear(64 * (in_size // (32 if in_size >= 32 else 4))**2, classes)
         )
 
     def forward(self, input):
