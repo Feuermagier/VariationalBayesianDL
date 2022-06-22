@@ -67,13 +67,6 @@ def vogn_step(parameters, grads, states):
                 new_parameters.append(param - update)
     return new_parameters, states
 
-def vogn_stds(states):
-    stds = []
-    for state in states:
-        delta = state["augmentation"] * state["prior_prec"] / state["N"]
-        stds.append((1 / (delta + state["scale"] + state["damping"]) / state["N"]).sqrt())
-    return stds
-
 
 class VOGNModule(nn.Module):
     def __init__(self, layers):
@@ -133,14 +126,10 @@ class VOGNModule(nn.Module):
             print(f"Final loss {epoch_loss}")
 
     def infer(self, input, samples):
-        def sample_single(model, params, stds, buffers, input):
-            perturbed_params = []
-            for param, std in zip(params, stds):
-                noise = torch.randn_like(param, device=param.device)
-                perturbed_params.append(param + noise * std)
+        def sample_single(model, params, buffers, input):
+            perturbed_params = vogn_prepare(params, self.optim_state)
             return model(perturbed_params, buffers, input)
-        param_stds = vogn_stds(self.optim_state)
-        o = vmap(sample_single, in_dims=(None, None, None, None, 0), randomness="different")(self.model, self.params, param_stds, self.buffs, input.expand(samples, *input.shape))
+        o = vmap(sample_single, in_dims=(None, None, None, 0), randomness="different")(self.model, self.params, self.buffs, input.expand(samples, *input.shape))
         return o.squeeze(1)
 
     def forward(self, input, samples=1):
@@ -158,10 +147,10 @@ def ivon_init(parameters, N, init):
         state = {}
         state["lr"] = init["lr"]
         state["betas"] = init["betas"] if "betas" in init else (0.9, 0.999)
-        state["prior_prec"] = init["prior_prec"] if "prior_prec" in init else 1
-        state["damping"] = init["damping"] if "damping" in init else 1e-3
-        state["tempering"] = init["tempering"] if "tempering" in init else 1
-        state["augmentation"] = init["augmentation"] if "augmentation" in init else 1
+        state["prior_prec"] = init["prior_prec"] if "prior_prec" in init else 1.0
+        state["damping"] = init["damping"] if "damping" in init else 0.0
+        state["tempering"] = init["tempering"] if "tempering" in init else 1.0
+        state["augmentation"] = init["augmentation"] if "augmentation" in init else 1.0
 
         state["N"] = N * state["augmentation"]
         state["momentum"] = torch.zeros_like(param, device=param.device)
@@ -272,14 +261,10 @@ class iVONModuleFunctorch(nn.Module):
             print(f"Final loss {epoch_loss}")
 
     def infer(self, input, samples):
-        def sample_single(model, params, stds, buffers, input):
-            perturbed_params = []
-            for param, std in zip(params, stds):
-                noise = torch.randn_like(param, device=param.device)
-                perturbed_params.append(param + noise * std)
+        def sample_single(model, params, buffers, input):
+            perturbed_params, _ = ivon_prepare(params, self.optim_state)
             return model(perturbed_params, buffers, input)
-        param_stds = ivon_stds(self.optim_state)
-        o = vmap(sample_single, in_dims=(None, None, None, None, 0), randomness="different")(self.model, self.params, param_stds, self.buffs, input.expand(samples, -1, -1))
+        o = vmap(sample_single, in_dims=(None, None, None, 0), randomness="different")(self.model, self.params, self.buffs, input.expand(samples, -1, -1))
         return o.squeeze(1)
 
     def forward(self, input, samples=1):

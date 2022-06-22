@@ -86,6 +86,7 @@ class GaussLayer(nn.Module):
         super().__init__()
         if learn_var:
             self.std = nn.Parameter(std_init)
+            self.std.should_sample = False
         else:
             self.register_buffer("std", std_init)
         self.learn_var = learn_var
