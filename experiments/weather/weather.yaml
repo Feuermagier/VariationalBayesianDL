@@ -6,7 +6,7 @@ job-name: "bdl-uci"
 num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
-mem-per-cpu: 1000
+mem-per-cpu: 32000
 time: 60
 
 ---
