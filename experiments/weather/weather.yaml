@@ -1,0 +1,95 @@
+---
+# Slurm config
+name: "SLURM"
+partition: "single"
+job-name: "bdl-uci"
+num_parallel_jobs: 120
+ntasks: 1
+cpus-per-task: 2
+mem-per-cpu: 1000
+time: 60
+
+---
+name: "DEFAULT"
+path: "results"
+repetitions: 10
+reps_per_job: 10
+reps_in_parallel: 1
+
+params:
+  batch_size: 32
+  data_path: "../../data/"
+  eval_samples: 100
+  init_std: 0.1
+
+---
+name: "MAP"
+params:
+  model: "map"
+  lr: 0.001
+  epochs: 100
+
+---
+name: "Ensemble-5"
+params:
+  model: "ensemble"
+  members: 5
+  lr: 0.001
+  epochs: 100
+
+---
+name: "SWAG"
+params:
+  model: "swag"
+  swag_config:
+    deviation_samples: 30
+    start_epoch: 20
+  lr: 0.001
+  epochs: 100
+
+---
+name: "MultiSWAG"
+params:
+  model: "multi_swag"
+  members: 5
+  swag_config:
+    deviation_samples: 30
+    start_epoch: 20
+  lr: 0.001
+  epochs: 100
+
+---
+name: "MCDropout"
+params:
+  model: "mc_dropout"
+  p: 0.2
+  lr: 0.001
+  epochs: 100
+
+---
+name: "MultiMCDropout"
+params:
+  model: "multi_mc_dropout"
+  members: 5
+  p: 0.2
+  lr: 0.001
+  epochs: 100
+
+---
+name: "MFVI"
+params:
+  model: "mfvi"
+  lr: 0.001
+  epochs: 100,
+  mc_samples: 2,
+  kl_rescaling: 0.2
+
+---
+name: "MultiMFVI"
+params:
+  model: "multi_mfvi"
+  members: 5
+  lr: 0.001
+  epochs: 100,
+  mc_samples: 2,
+  kl_rescaling: 0.2

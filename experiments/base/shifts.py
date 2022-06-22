@@ -31,3 +31,10 @@ class WeatherShiftsDataset:
         data = pd.read_csv(self.path + "Shifts/weather/shifts_canonical_eval_in.csv").dropna()
         dataset = NormalizedTensorDataset(*_split(data), data_mean=self.data_mean, data_std=self.data_std, target_mean=self.target_mean, target_std=self.target_std)
         return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+    def out_testloader(self, batch_size, shuffle=True):
+        assert self.trainset_loaded
+        data = pd.read_csv(self.path + "Shifts/weather/shifts_canonical_eval_out.csv").dropna()
+        dataset = NormalizedTensorDataset(*_split(data), data_mean=self.data_mean, data_std=self.data_std, target_mean=self.target_mean, target_std=self.target_std)
+        return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+

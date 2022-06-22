@@ -5,7 +5,7 @@ import torch
 import matplotlib.pyplot as plt
 import time
 
-from experiments.base.weather import WeatherShiftsDataset
+from experiments.base.shifts import WeatherShiftsDataset
 from experiments.uci.results import UCIResults
 
 from cw2.cw_data import cw_logging
@@ -24,79 +24,79 @@ def run(device, config, out_path, log):
 
     dataset = WeatherShiftsDataset(config["data_path"])
 
-    loaders = [(dataset.trainloader(config["batch_size"]), dataset.in_testloader(config["batch_size"]))]
+    trainloader = dataset.trainloader(config["batch_size"])
 
-    for i, (trainloader, testloader) in enumerate(loaders):
+    init_std = torch.tensor(config["init_std"]).to(device)
+    model = config["model"]
 
-        init_var = torch.tensor(config["init_var"]).to(device)
-        model = config["model"]
+    before = time.time()
+    if model == "map":
+        trained_model = run_map(device, trainloader,
+                                init_std, config)
+    elif model == "ensemble":
+        trained_model = run_ensemble(
+            device, trainloader, init_std, config)
+    elif model == "swag":
+        trained_model = run_swag(
+            device, trainloader, init_std, config)
+    elif model == "multi_swag":
+        trained_model = run_multi_swag(
+            device, trainloader, init_std, config)
+    elif model == "mc_dropout":
+        trained_model = run_mc_dropout(
+            device, trainloader, init_std, config)
+    elif model == "multi_mc_dropout":
+        trained_model = run_multi_mc_dropout(
+            device, trainloader, init_std, config)
+    elif model == "mfvi":
+        trained_model = run_mfvi(
+            device, trainloader, init_std, config)
+    elif model == "multi_mfvi":
+        trained_model = run_multi_mfvi(
+            device, trainloader, init_std, config)
+    else:
+        raise ValueError(f"Unknown model type '{model}'")
 
-        before = time.time()
-        if model == "map":
-            trained_model = run_map(device, trainloader,
-                                    dataset.in_dim, init_var, config, out_path)
-        elif model == "ensemble":
-            trained_model = run_ensemble(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "swag":
-            trained_model = run_swag(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "multi_swag":
-            trained_model = run_multi_swag(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "mc_dropout":
-            trained_model = run_mc_dropout(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "multi_mc_dropout":
-            trained_model = run_multi_mc_dropout(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "mfvi":
-            trained_model = run_mfvi(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "multi-mfvi":
-            trained_model = run_multi_mfvi(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "lrvi":
-            trained_model = run_lrvi(
-                device, trainloader, dataset.in_dim, init_var, config, out_path)
-        elif model == "sgld":
-            trained_model = run_sgld(device, trainloader, dataset.in_dim, init_var, config, out_path)
-        else:
-            raise ValueError(f"Unknown model type '{model}'")
+    after = time.time()
+    log.info(f"Time: {after - before}s")
 
-        after = time.time()
-        log.info(f"Time: {after - before}s")
+    torch.save(trained_model.state_dict(), out_path + f"model.tar")
 
-        torch.save(trained_model.state_dict(), out_path + f"model_{i}.tar")
+    # Plot loss
+    fig, ax = plt.subplots()
+    plot_losses(model, trained_model.all_losses(), ax)
+    fig.set_tight_layout(True)
+    fig.savefig(out_path + f"loss.pdf")
 
-        results = RegressionResults(testloader, model, trained_model.infer,
-                                    config["eval_samples"], device, target_mean=dataset.target_mean, target_std=dataset.target_std)
-        log.info(f"Avg LML: {results.average_lml}")
-        log.info(f"Mean MSE: {results.mean_mse}")
-        log.info(f"MSE of Means: {results.mse_of_means}")
-        log.info(f"QCE: {results.qce}")
+    # Eval in
+    testloader = dataset.in_testloader(128)
+    results = RegressionResults(testloader, model, trained_model.infer,
+                                config["eval_samples"], device, target_mean=dataset.target_mean, target_std=dataset.target_std)
+    log.info(f"In Avg LML: {results.average_lml}")
+    log.info(f"In Mean MSE: {results.mean_mse}")
+    log.info(f"In MSE of Means: {results.mse_of_means}")
+    log.info(f"In QCE: {results.qce}")
+    UCIResults(model, config["dataset"], results, after - before).store(out_path + f"results_in.pyc")
 
-        UCIResults(model, config["dataset"], results, after - before).store(out_path + f"results_{i}.pyc")
-
-        # Plot loss
-        fig, ax = plt.subplots()
-        plot_losses(model, trained_model.all_losses(), ax)
-        fig.set_tight_layout(True)
-        fig.savefig(out_path + f"loss_{i}.pdf")
-
-        # Plot calibration
-        fig, ax = plt.subplots()
-        plot_calibration(None, results, ax, include_text=True)
-        fig.set_tight_layout(True)
-        fig.savefig(out_path + f"reliability_{i}.pdf")
+    # Eval out
+    testloader = dataset.out_testloader(128)
+    results = RegressionResults(testloader, model, trained_model.infer,
+                                config["eval_samples"], device, target_mean=dataset.target_mean, target_std=dataset.target_std)
+    log.info(f"Out Avg LML: {results.average_lml}")
+    log.info(f"Out Mean MSE: {results.mean_mse}")
+    log.info(f"Out MSE of Means: {results.mse_of_means}")
+    log.info(f"Out QCE: {results.qce}")
+    UCIResults(model, config["dataset"], results, after - before).store(out_path + f"results_out.pyc")
 
 
-def run_map(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_map(device, trainloader, init_std, config):
     layers = [
-        ("fc", (in_dim, 50)),
+        ("fc", (123, 250)),
         ("relu", ()),
-        ("fc", (50, 1)),
-        ("gauss", (init_var, True))
+        ("fc", (250, 250)),
+        ("relu", ()),
+        ("fc", (250, 1)),
+        ("gauss", (init_std, True)),
     ]
 
     model = MAP(layers)
@@ -105,13 +105,15 @@ def run_map(device, trainloader, in_dim, init_var, config, model_out_path):
     return model
 
 
-def run_ensemble(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_ensemble(device, trainloader, init_std, config):
     members = config["members"]
     layers = [
-        ("fc", (in_dim, 50)),
+        ("fc", (123, 250)),
         ("relu", ()),
-        ("fc", (50, 1)),
-        ("gauss", (init_var, True))
+        ("fc", (250, 250)),
+        ("relu", ()),
+        ("fc", (250, 1)),
+        ("gauss", (init_std, True)),
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
@@ -120,12 +122,14 @@ def run_ensemble(device, trainloader, in_dim, init_var, config, model_out_path):
     return model
 
 
-def run_swag(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_swag(device, trainloader, init_std, config):
     layers = [
-        ("fc", (in_dim, 50)),
+        ("fc", (123, 250)),
         ("relu", ()),
-        ("fc", (50, 1)),
-        ("gauss", (init_var, True))
+        ("fc", (250, 250)),
+        ("relu", ()),
+        ("fc", (250, 1)),
+        ("gauss", (init_std, True)),
     ]
 
     swag_config = config["swag_config"]
@@ -136,13 +140,15 @@ def run_swag(device, trainloader, in_dim, init_var, config, model_out_path):
     return model
 
 
-def run_multi_swag(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_multi_swag(device, trainloader, init_std, config):
     members = config["members"]
     layers = [
-        ("fc", (in_dim, 50)),
+        ("fc", (123, 250)),
         ("relu", ()),
-        ("fc", (50, 1)),
-        ("gauss", (init_var, True))
+        ("fc", (250, 250)),
+        ("relu", ()),
+        ("fc", (250, 1)),
+        ("gauss", (init_std, True)),
     ]
 
     swag_config = config["swag_config"]
@@ -153,14 +159,15 @@ def run_multi_swag(device, trainloader, in_dim, init_var, config, model_out_path
     return model
 
 
-def run_mc_dropout(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_mc_dropout(device, trainloader, init_std, config):
     p = config["p"]
     layers = [
-        ("fc", (in_dim, 50)),
-        ("dropout", (p,)),
+        ("fc", (123, 250)),
         ("relu", ()),
-        ("fc", (50, 1)),
-        ("gauss", (init_var, True))
+        ("fc", (250, 250)),
+        ("relu", ()),
+        ("fc", (250, 1)),
+        ("gauss", (init_std, True)),
     ]
 
     model = MAP(layers)
@@ -169,15 +176,16 @@ def run_mc_dropout(device, trainloader, in_dim, init_var, config, model_out_path
     return model
 
 
-def run_multi_mc_dropout(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_multi_mc_dropout(device, trainloader, init_std, config):
     members = config["members"]
     p = config["p"]
     layers = [
-        ("fc", (in_dim, 50)),
-        ("dropout", (p,)),
+        ("fc", (123, 250)),
         ("relu", ()),
-        ("fc", (50, 1)),
-        ("gauss", (init_var, True))
+        ("fc", (250, 250)),
+        ("relu", ()),
+        ("fc", (250, 1)),
+        ("gauss", (init_std, True)),
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
@@ -186,13 +194,15 @@ def run_multi_mc_dropout(device, trainloader, in_dim, init_var, config, model_ou
     return model
 
 
-def run_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_mfvi(device, trainloader, init_std, config):
     prior = GaussianPrior(0, 1)
     layers = [
-        ("v_fc", (in_dim, 50, prior, {"rho_init": -3})),
+        ("v_fc", (123, 250, prior)),
         ("relu", ()),
-        ("v_fc", (50, 1, prior, {"rho_init": -3})),
-        ("gauss", (init_var, True))
+        ("v_fc", (250, 250, prior)),
+        ("relu", ()),
+        ("v_fc", (250, 1, prior)),
+        ("gauss", (init_std, True)),
     ]
 
     model = BBBModel(layers)
@@ -200,28 +210,16 @@ def run_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_lrvi(device, trainloader, in_dim, init_var, config, model_out_path):
-    k = config["k"]
-    layers = [
-        ("vlr_fc", (in_dim, 50, k, 1, {"rho_init": -3})),
-        ("relu", ()),
-        ("vlr_fc", (50, 1, k, 1, {"rho_init": -3})),
-        ("gauss", (init_var, True))
-    ]
-
-    model = BBBModel(layers)
-    model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
-                      device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
-    return model
-
-def run_multi_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
+def run_multi_mfvi(device, trainloader, init_std, config):
     members = config["members"]
     prior = GaussianPrior(0, 1)
     layers = [
-        ("v_fc", (in_dim, 50, prior, {"rho_init": -3})),
+        ("v_fc", (123, 250, prior)),
         ("relu", ()),
-        ("v_fc", (50, 1, prior, {"rho_init": -3})),
-        ("gauss", (init_var, True))
+        ("v_fc", (250, 250, prior)),
+        ("relu", ()),
+        ("v_fc", (250, 1, prior)),
+        ("gauss", (init_std, True)),
     ]
 
     model = Ensemble([BBBModel(layers) for _ in range(members)])
@@ -229,23 +227,10 @@ def run_multi_mfvi(device, trainloader, in_dim, init_var, config, model_out_path
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_sgld(device, trainloader, in_dim, init_var, config, model_out_path):
-    layers = [
-        ("fc", (in_dim, 50)),
-        ("relu", ()),
-        ("fc", (50, 1)),
-        ("gauss", (init_var, True))
-    ]
-
-    model = SGLDModule(layers, config["burnin"], config["interval"])
-    model.train_model(config["epochs"], nll_loss, sgld(config["lr"]), trainloader, config["batch_size"],
-                      device, report_every_epochs=1)
-    return model
-
 ####################### CW2 #####################################
 
 
-class UCIExperiment(experiment.AbstractExperiment):
+class WeatherExperiment(experiment.AbstractExperiment):
     def initialize(self, config: dict, rep: int, logger: cw_logging.LoggerArray) -> None:
         pass
 
@@ -264,5 +249,5 @@ class UCIExperiment(experiment.AbstractExperiment):
 
 
 if __name__ == "__main__":
-    cw = cluster_work.ClusterWork(UCIExperiment)
+    cw = cluster_work.ClusterWork(WeatherExperiment)
     cw.run()
