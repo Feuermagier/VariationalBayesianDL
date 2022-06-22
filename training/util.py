@@ -18,8 +18,7 @@ def adam(lr, weight_decay=0):
 def nll_loss(output, target, eps: float = 1e-6,):
     mean = output[...,0]
     var = output[...,1]**2
-    with torch.no_grad():
-        var = var.clamp(min=eps)
+    var = var.clamp(min=eps)
     #return F.gaussian_nll_loss(mean, target, std**2, reduction)
     # Custom implementation without any() to support functorch
     loss = 0.5 * (torch.log(var) + (mean - target)**2 / var)
@@ -85,22 +84,19 @@ class GaussianMixture:
 class GaussLayer(nn.Module):
     def __init__(self, std_init: torch.Tensor, learn_var: bool = False):
         super().__init__()
-        rho = torch.log(torch.exp(std_init) - 1)
         if learn_var:
-            self.rho = nn.Parameter(rho)
+            self.std = nn.Parameter(std_init)
         else:
-            self.register_buffer("rho", rho)
+            self.register_buffer("std", std_init)
         self.learn_var = learn_var
 
     def forward(self, input):
-        return torch.stack((input, F.softplus(self.rho).expand(input.shape)), dim=-1)
-
-    def all_losses(self):
-        return self.mean.all_losses()
+        out = torch.stack((input, self.std.expand(input.shape)), dim=-1)
+        return out
 
     @property
     def var(self):
-        return F.softplus(self.rho)**2
+        return self.std**2
 
 def plot_losses(name, losses, ax):
     epochs = max([len(loss) for loss in losses])

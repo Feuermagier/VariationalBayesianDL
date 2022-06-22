@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from .network import generate_model
+from torchviz import make_dot
 
 class MAP(nn.Module):
     def __init__(self, layers):
@@ -37,6 +38,7 @@ class MAP(nn.Module):
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.cpu().item()
+                #return make_dot(loss, params=dict(self.model.named_parameters()))
             epoch_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
 

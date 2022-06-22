@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 60
+time: 90
 sbatch_args:
   gres: "gpu:1"
 
@@ -94,11 +94,11 @@ name: "VOGN"
 params:
   model: "vogn"
   vogn:
-    lr: 0.001
-    prior_prec: 10
-    damping: 0.001
+    lr: 0.01
+    prior_prec: 50
+    damping: 0.0001
     sample: True
-  mc_samples: 2
+  mc_samples: 5
   epochs: 30
 
 ---
@@ -107,9 +107,9 @@ params:
   model: "multi_vogn"
   members: 5
   vogn:
-    lr: 0.001
-    prior_prec: 10
-    damping: 0.001
+    lr: 0.01
+    prior_prec: 50
+    damping: 0.0001
     sample: True
-  mc_samples: 2
+  mc_samples: 5
   epochs: 30

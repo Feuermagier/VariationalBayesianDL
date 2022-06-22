@@ -5,7 +5,7 @@ import torch
 import matplotlib.pyplot as plt
 import time
 
-from experiments.base.uci import UCIDatasets
+from experiments.base.weather import WeatherShiftsDataset
 from experiments.uci.results import UCIResults
 
 from cw2.cw_data import cw_logging
@@ -22,51 +22,45 @@ from training.sgld import SGLDModule, sgld
 
 def run(device, config, out_path, log):
 
-    dataset = UCIDatasets(config["dataset"], config["data_path"],
-                          test_percentage=config["test_percentage"], normalize=True, subsample=1)
+    dataset = WeatherShiftsDataset(config["data_path"])
 
-    if config["gap"] is True:
-        loaders = [(torch.utils.data.DataLoader(split[0], config["batch_size"], shuffle=False),
-            torch.utils.data.DataLoader(split[1], config["batch_size"], shuffle=False)) for split in dataset.gap_splits]
-    else:
-        loaders = [(torch.utils.data.DataLoader(dataset.train_set, config["batch_size"], shuffle=False),
-            torch.utils.data.DataLoader(dataset.test_set, config["batch_size"], shuffle=False))]
+    loaders = [(dataset.trainloader(config["batch_size"]), dataset.in_testloader(config["batch_size"]))]
 
     for i, (trainloader, testloader) in enumerate(loaders):
 
-        init_std = torch.tensor(config["init_std"]).to(device)
+        init_var = torch.tensor(config["init_var"]).to(device)
         model = config["model"]
 
         before = time.time()
         if model == "map":
             trained_model = run_map(device, trainloader,
-                                    dataset.in_dim, init_std, config, out_path)
+                                    dataset.in_dim, init_var, config, out_path)
         elif model == "ensemble":
             trained_model = run_ensemble(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "swag":
             trained_model = run_swag(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "multi_swag":
             trained_model = run_multi_swag(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "mc_dropout":
             trained_model = run_mc_dropout(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "multi_mc_dropout":
             trained_model = run_multi_mc_dropout(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "mfvi":
             trained_model = run_mfvi(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "multi-mfvi":
             trained_model = run_multi_mfvi(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "lrvi":
             trained_model = run_lrvi(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_var, config, out_path)
         elif model == "sgld":
-            trained_model = run_sgld(device, trainloader, dataset.in_dim, init_std, config, out_path)
+            trained_model = run_sgld(device, trainloader, dataset.in_dim, init_var, config, out_path)
         else:
             raise ValueError(f"Unknown model type '{model}'")
 
@@ -97,12 +91,12 @@ def run(device, config, out_path, log):
         fig.savefig(out_path + f"reliability_{i}.pdf")
 
 
-def run_map(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_map(device, trainloader, in_dim, init_var, config, model_out_path):
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
         ("fc", (50, 1)),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = MAP(layers)
@@ -111,13 +105,13 @@ def run_map(device, trainloader, in_dim, init_std, config, model_out_path):
     return model
 
 
-def run_ensemble(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_ensemble(device, trainloader, in_dim, init_var, config, model_out_path):
     members = config["members"]
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
         ("fc", (50, 1)),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
@@ -126,12 +120,12 @@ def run_ensemble(device, trainloader, in_dim, init_std, config, model_out_path):
     return model
 
 
-def run_swag(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_swag(device, trainloader, in_dim, init_var, config, model_out_path):
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
         ("fc", (50, 1)),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     swag_config = config["swag_config"]
@@ -142,13 +136,13 @@ def run_swag(device, trainloader, in_dim, init_std, config, model_out_path):
     return model
 
 
-def run_multi_swag(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_multi_swag(device, trainloader, in_dim, init_var, config, model_out_path):
     members = config["members"]
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
         ("fc", (50, 1)),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     swag_config = config["swag_config"]
@@ -159,14 +153,14 @@ def run_multi_swag(device, trainloader, in_dim, init_std, config, model_out_path
     return model
 
 
-def run_mc_dropout(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_mc_dropout(device, trainloader, in_dim, init_var, config, model_out_path):
     p = config["p"]
     layers = [
         ("fc", (in_dim, 50)),
         ("dropout", (p,)),
         ("relu", ()),
         ("fc", (50, 1)),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = MAP(layers)
@@ -175,7 +169,7 @@ def run_mc_dropout(device, trainloader, in_dim, init_std, config, model_out_path
     return model
 
 
-def run_multi_mc_dropout(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_multi_mc_dropout(device, trainloader, in_dim, init_var, config, model_out_path):
     members = config["members"]
     p = config["p"]
     layers = [
@@ -183,7 +177,7 @@ def run_multi_mc_dropout(device, trainloader, in_dim, init_std, config, model_ou
         ("dropout", (p,)),
         ("relu", ()),
         ("fc", (50, 1)),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
@@ -192,13 +186,13 @@ def run_multi_mc_dropout(device, trainloader, in_dim, init_std, config, model_ou
     return model
 
 
-def run_mfvi(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
     prior = GaussianPrior(0, 1)
     layers = [
         ("v_fc", (in_dim, 50, prior, {"rho_init": -3})),
         ("relu", ()),
         ("v_fc", (50, 1, prior, {"rho_init": -3})),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = BBBModel(layers)
@@ -206,13 +200,13 @@ def run_mfvi(device, trainloader, in_dim, init_std, config, model_out_path):
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_lrvi(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_lrvi(device, trainloader, in_dim, init_var, config, model_out_path):
     k = config["k"]
     layers = [
         ("vlr_fc", (in_dim, 50, k, 1, {"rho_init": -3})),
         ("relu", ()),
         ("vlr_fc", (50, 1, k, 1, {"rho_init": -3})),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = BBBModel(layers)
@@ -220,14 +214,14 @@ def run_lrvi(device, trainloader, in_dim, init_std, config, model_out_path):
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_multi_mfvi(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_multi_mfvi(device, trainloader, in_dim, init_var, config, model_out_path):
     members = config["members"]
     prior = GaussianPrior(0, 1)
     layers = [
         ("v_fc", (in_dim, 50, prior, {"rho_init": -3})),
         ("relu", ()),
         ("v_fc", (50, 1, prior, {"rho_init": -3})),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = Ensemble([BBBModel(layers) for _ in range(members)])
@@ -235,12 +229,12 @@ def run_multi_mfvi(device, trainloader, in_dim, init_std, config, model_out_path
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_sgld(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_sgld(device, trainloader, in_dim, init_var, config, model_out_path):
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
         ("fc", (50, 1)),
-        ("gauss", (init_std, True))
+        ("gauss", (init_var, True))
     ]
 
     model = SGLDModule(layers, config["burnin"], config["interval"])

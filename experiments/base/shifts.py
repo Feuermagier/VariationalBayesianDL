@@ -6,15 +6,16 @@ from experiments.base.normalized import NormalizedTensorDataset
 
 
 def _split(data):
-    return torch.tensor(data.iloc[:,6:].values).float(), torch.tensor(data["fact_temperature"].values).float()
+    return torch.tensor(data.iloc[:,6:].values).float(), torch.tensor(data["fact_temperature"].values).float().unsqueeze(-1)
 
 class WeatherShiftsDataset:
     def __init__(self, path):
         self.path = path
         self.trainset_loaded = False
     
-    def trainloader(self, batch_size, shuffle=True):
-        data = pd.read_csv(self.path + "Shifts/weather/shifts_canonical_train.csv").dropna()
+    def trainloader(self, batch_size, shuffle=True, small=False):
+        name = "Shifts/weather/shifts_canonical_dev_in.csv" if small else "Shifts/weather/shifts_canonical_train.csv"
+        data = pd.read_csv(self.path + name).dropna()
         dataset = NormalizedTensorDataset(*_split(data))
 
         self.data_mean = dataset.data_mean
