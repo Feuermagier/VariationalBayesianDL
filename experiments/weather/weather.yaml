@@ -13,7 +13,6 @@ time: 60
 name: "DEFAULT"
 path: "results"
 repetitions: 10
-reps_per_job: 10
 reps_in_parallel: 1
 
 params:
@@ -27,7 +26,7 @@ name: "MAP"
 params:
   model: "map"
   lr: 0.001
-  epochs: 100
+  epochs: 20
 
 ---
 name: "Ensemble-5"
@@ -35,7 +34,7 @@ params:
   model: "ensemble"
   members: 5
   lr: 0.001
-  epochs: 100
+  epochs: 20
 
 ---
 name: "SWAG"
@@ -43,9 +42,10 @@ params:
   model: "swag"
   swag_config:
     deviation_samples: 30
-    start_epoch: 20
+    mean_samples: 30
+    start_epoch: 15
   lr: 0.001
-  epochs: 100
+  epochs: 20
 
 ---
 name: "MultiSWAG"
@@ -54,9 +54,10 @@ params:
   members: 5
   swag_config:
     deviation_samples: 30
-    start_epoch: 20
+    mean_samples: 30
+    start_epoch: 15
   lr: 0.001
-  epochs: 100
+  epochs: 20
 
 ---
 name: "MCDropout"
@@ -64,7 +65,7 @@ params:
   model: "mc_dropout"
   p: 0.2
   lr: 0.001
-  epochs: 100
+  epochs: 20
 
 ---
 name: "MultiMCDropout"
@@ -73,14 +74,14 @@ params:
   members: 5
   p: 0.2
   lr: 0.001
-  epochs: 100
+  epochs: 20
 
 ---
 name: "MFVI"
 params:
   model: "mfvi"
   lr: 0.001
-  epochs: 100,
+  epochs: 20,
   mc_samples: 2,
   kl_rescaling: 0.2
 
@@ -90,6 +91,6 @@ params:
   model: "multi_mfvi"
   members: 5
   lr: 0.001
-  epochs: 100,
+  epochs: 20,
   mc_samples: 2,
   kl_rescaling: 0.2
