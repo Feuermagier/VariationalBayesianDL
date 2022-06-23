@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
 mem-per-cpu: 32000
-time: 60
+time: 180
 
 ---
 name: "DEFAULT"
@@ -28,69 +28,69 @@ params:
   lr: 0.001
   epochs: 20
 
----
-name: "Ensemble-5"
-params:
-  model: "ensemble"
-  members: 5
-  lr: 0.001
-  epochs: 20
+# ---
+# name: "Ensemble-5"
+# params:
+#   model: "ensemble"
+#   members: 5
+#   lr: 0.001
+#   epochs: 20
 
----
-name: "SWAG"
-params:
-  model: "swag"
-  swag_config:
-    deviation_samples: 30
-    mean_samples: 30
-    start_epoch: 15
-  lr: 0.001
-  epochs: 20
+# ---
+# name: "SWAG"
+# params:
+#   model: "swag"
+#   swag_config:
+#     deviation_samples: 30
+#     mean_samples: 30
+#     start_epoch: 15
+#   lr: 0.001
+#   epochs: 20
 
----
-name: "MultiSWAG"
-params:
-  model: "multi_swag"
-  members: 5
-  swag_config:
-    deviation_samples: 30
-    mean_samples: 30
-    start_epoch: 15
-  lr: 0.001
-  epochs: 20
+# ---
+# name: "MultiSWAG"
+# params:
+#   model: "multi_swag"
+#   members: 5
+#   swag_config:
+#     deviation_samples: 30
+#     mean_samples: 30
+#     start_epoch: 15
+#   lr: 0.001
+#   epochs: 20
 
----
-name: "MCDropout"
-params:
-  model: "mc_dropout"
-  p: 0.2
-  lr: 0.001
-  epochs: 20
+# ---
+# name: "MCDropout"
+# params:
+#   model: "mc_dropout"
+#   p: 0.2
+#   lr: 0.001
+#   epochs: 20
 
----
-name: "MultiMCDropout"
-params:
-  model: "multi_mc_dropout"
-  members: 5
-  p: 0.2
-  lr: 0.001
-  epochs: 20
+# ---
+# name: "MultiMCDropout"
+# params:
+#   model: "multi_mc_dropout"
+#   members: 5
+#   p: 0.2
+#   lr: 0.001
+#   epochs: 20
 
----
-name: "MFVI"
-params:
-  model: "mfvi"
-  lr: 0.001
-  epochs: 20,
-  mc_samples: 2,
-  kl_rescaling: 0.2
+# ---
+# name: "MFVI"
+# params:
+#   model: "mfvi"
+#   lr: 0.001
+#   epochs: 20,
+#   mc_samples: 2,
+#   kl_rescaling: 0.2
 
----
-name: "MultiMFVI"
-params:
-  model: "multi_mfvi"
-  members: 5
-  lr: 0.001
-  epochs: 20,
-  mc_samples: 2,
-  kl_rescaling: 0.2
+# ---
+# name: "MultiMFVI"
+# params:
+#   model: "multi_mfvi"
+#   members: 5
+#   lr: 0.001
+#   epochs: 20,
+#   mc_samples: 2,
+#   kl_rescaling: 0.2
