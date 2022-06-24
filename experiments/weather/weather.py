@@ -116,8 +116,6 @@ def run_map(device, trainloader, init_std, es, config):
         ("gauss", (init_std, True)),
     ]
 
-    es = EarlyStopper()
-
     model = MAP(layers)
     model.train_model(config["epochs"], nll_loss, adam(
         config["lr"]), trainloader, config["batch_size"], device, early_stopping=es, report_every_epochs=1)
