@@ -64,19 +64,19 @@ params:
   epochs: 50
 
 
----
-name: "MCDropout"
-params:
-  model: "mc_dropout"
-  p: 0.1
-  lr: 0.001
-  epochs: 50
+# ---
+# name: "MCDropout"
+# params:
+#   model: "mc_dropout"
+#   p: 0.1
+#   lr: 0.001
+#   epochs: 50
 
----
-name: "MultiMCDropout"
-params:
-  model: "multi_mc_dropout"
-  members: 5
-  p: 0.1
-  lr: 0.001
-  epochs: 50
+# ---
+# name: "MultiMCDropout"
+# params:
+#   model: "multi_mc_dropout"
+#   members: 5
+#   p: 0.1
+#   lr: 0.001
+#   epochs: 50

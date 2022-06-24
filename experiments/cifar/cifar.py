@@ -42,12 +42,13 @@ def run(device, config, out_path, log):
     #torch.save(trained_model.state_dict(), out_path + "model.tar")
 
     classes = [i for i in range(10) if i not in class_exclusion] if class_exclusion != [] else []
-    if "normal" in config["eval"]:
-        if class_exclusion != []:
-            log.info(f"Evaluating only on classes {class_exclusion}")
-        testloader = cifar.cifar10_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
-        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
-        CIFARResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
+
+    if class_exclusion != []:
+        log.info(f"Evaluating only on classes {class_exclusion}")
+    testloader = cifar.cifar10_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
+    acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
+    CIFARResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
+
     for i in config["intensities"]:
         testloader = cifar.cifar10_corrupted_testloader(config["data_path"], i, config["batch_size"], exclude_classes=classes)
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"C({i})", log)
