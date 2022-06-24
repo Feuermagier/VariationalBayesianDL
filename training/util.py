@@ -99,7 +99,7 @@ class GaussLayer(nn.Module):
     def var(self):
         return self.std**2
 
-def plot_losses(name, losses, ax):
+def plot_losses(name, losses, ax, val_losses=[]):
     epochs = max([len(loss) for loss in losses])
     ax.set_xlabel("Epoch", fontsize=14)
     ax.set_xticks(np.arange(0, epochs + 1, epochs // 10 if epochs > 10 else 1))
@@ -109,4 +109,42 @@ def plot_losses(name, losses, ax):
             ax.plot(np.arange(1, len(single_losses) + 1, 1), single_losses, label=f"{name} ({i})")
     else:
         ax.plot(np.arange(1, len(losses[0]) + 1, 1), losses[0], label=name)
+    
+    if len(val_losses) > 0:
+        ax.plot(np.arange(1, len(val_losses) + 1, 1), val_losses, label=name + " (Validation)")
+
     ax.legend(loc="upper right")
+
+
+class EarlyStopper:
+    def __init__(self, evaluator, interval, delta, patience):
+        self.evaluator = evaluator
+        self.interval = interval
+        self.delta = delta
+        self.patience = patience
+
+        self.losses = []
+        self.best_loss = float("inf")
+        self.epochs_since_best = 0
+
+    def should_stop(self, model, epoch):
+        if epoch % self.interval != 0:
+            return False
+
+        with torch.no_grad():
+            loss = self.evaluator(model)
+            self.losses.append(loss)
+
+            if loss < self.best_loss - self.delta:
+                self.best_loss = loss
+                self.epochs_since_best = 0
+            else:
+                self.epochs_since_best += 1
+            #print(f"val loss {loss}")
+            #print(f"patience {self.epochs_since_best}")
+
+            if self.epochs_since_best > self.patience:
+                print(f"Stopping early")
+                return True
+            else:
+                return False

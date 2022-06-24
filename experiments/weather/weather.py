@@ -2,16 +2,17 @@ import sys
 sys.path.append("../../")
 
 import torch
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import time
 
 from experiments.base.shifts import WeatherShiftsDataset
-from experiments.uci.results import UCIResults
+from experiments.weather.results import WeatherResults
 
 from cw2.cw_data import cw_logging
 from cw2 import experiment, cw_error, cluster_work
 
-from training.util import adam, nll_loss, plot_losses
+from training.util import adam, nll_loss, plot_losses, EarlyStopper
 from training.swag import SwagModel
 from training.bbb import BBBModel, GaussianPrior
 from training.ensemble import Ensemble
@@ -25,14 +26,26 @@ def run(device, config, out_path, log):
     dataset = WeatherShiftsDataset(config["data_path"])
 
     trainloader = dataset.trainloader(config["batch_size"])
+    valloader = dataset.in_valloader(1000)
 
     init_std = torch.tensor(config["init_std"]).to(device)
     model = config["model"]
 
+    def validate(model):
+        with torch.no_grad():
+            loss = 0
+            for data, target in valloader:
+                output = model(data, 100).mean(dim=0)
+                loss += F.mse_loss(output[...,0], target).detach().item()
+            return loss / len(valloader)
+
+    es_config = config["early_stopping"]
+    es = EarlyStopper(validate, es_config["interval"], es_config["delta"], es_config["patience"])
+
     before = time.time()
     if model == "map":
         trained_model = run_map(device, trainloader,
-                                init_std, config)
+                                init_std, es, config)
     elif model == "ensemble":
         trained_model = run_ensemble(
             device, trainloader, init_std, config)
@@ -76,7 +89,7 @@ def run(device, config, out_path, log):
     log.info(f"In Mean MSE: {results.mean_mse}")
     log.info(f"In MSE of Means: {results.mse_of_means}")
     log.info(f"In QCE: {results.qce}")
-    UCIResults(model, config["dataset"], results, after - before).store(out_path + f"results_in.pyc")
+    WeatherResults(model, "in", results, after - before).store(out_path + f"results_in.pyc")
 
     # Eval out
     testloader = dataset.out_testloader(128)
@@ -86,12 +99,16 @@ def run(device, config, out_path, log):
     log.info(f"Out Mean MSE: {results.mean_mse}")
     log.info(f"Out MSE of Means: {results.mse_of_means}")
     log.info(f"Out QCE: {results.qce}")
-    UCIResults(model, config["dataset"], results, after - before).store(out_path + f"results_out.pyc")
+    WeatherResults(model, "out", results, after - before).store(out_path + f"results_out.pyc")
 
 
-def run_map(device, trainloader, init_std, config):
+def run_map(device, trainloader, init_std, es, config):
     layers = [
         ("fc", (123, 250)),
+        ("relu", ()),
+        ("fc", (250, 250)),
+        ("relu", ()),
+        ("fc", (250, 250)),
         ("relu", ()),
         ("fc", (250, 250)),
         ("relu", ()),
@@ -99,9 +116,11 @@ def run_map(device, trainloader, init_std, config):
         ("gauss", (init_std, True)),
     ]
 
+    es = EarlyStopper()
+
     model = MAP(layers)
     model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+        config["lr"]), trainloader, config["batch_size"], device, early_stopping=es, report_every_epochs=1)
     return model
 
 

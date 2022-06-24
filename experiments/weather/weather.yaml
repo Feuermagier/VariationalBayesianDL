@@ -7,25 +7,29 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
 mem-per-cpu: 32000
-time: 180
+time: 240
 
 ---
 name: "DEFAULT"
 path: "results"
-repetitions: 10
+repetitions: 2
 reps_in_parallel: 1
 
 params:
-  batch_size: 32
+  batch_size: 512
   data_path: "../../data/"
-  eval_samples: 100
+  eval_samples: 10
   init_std: 0.1
+  early_stopping:
+    interval: 1
+    delta: 0.00001
+    patience: 5
 
 ---
 name: "MAP"
 params:
   model: "map"
-  lr: 0.001
+  lr: 0.003
   epochs: 20
 
 # ---

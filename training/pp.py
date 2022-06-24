@@ -19,7 +19,7 @@ class MAP(nn.Module):
         self.model.load_state_dict(dict["model"])
         self.losses = dict["losses"]
 
-    def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, mc_samples=1, report_every_epochs=1):
+    def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, mc_samples=1, report_every_epochs=1, early_stopping=None):
         self.model.to(device)
         self.model.train()
         optimizer = optimizer_factory(self.model.parameters())
@@ -44,6 +44,10 @@ class MAP(nn.Module):
 
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")
+
+            if early_stopping is not None and early_stopping.should_stop(self.infer, epoch):
+                break
+
         if report_every_epochs >= 0:
             print(f"Final loss {epoch_loss}")
 
