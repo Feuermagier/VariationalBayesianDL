@@ -39,8 +39,9 @@ def run(device, config, out_path, log):
                 loss += F.mse_loss(output[...,0], target).detach().item()
             return loss / len(valloader)
 
-    es_config = config["early_stopping"]
-    es = EarlyStopper(validate, es_config["interval"], es_config["delta"], es_config["patience"])
+    # es_config = config["early_stopping"]
+    # es = EarlyStopper(validate, es_config["interval"], es_config["delta"], es_config["patience"])
+    es = None
 
     before = time.time()
     if model == "map":

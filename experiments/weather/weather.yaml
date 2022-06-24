@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
 mem-per-cpu: 32000
-time: 240
+time: 300
 
 ---
 name: "DEFAULT"
@@ -20,81 +20,81 @@ params:
   data_path: "../../data/"
   eval_samples: 10
   init_std: 0.1
-  early_stopping:
-    interval: 1
-    delta: 0.00001
-    patience: 5
+  # early_stopping:
+  #   interval: 1
+  #   delta: 0.00001
+  #   patience: 5
 
 ---
 name: "MAP"
 params:
   model: "map"
   lr: 0.003
-  epochs: 20
+  epochs: 30
 
-# ---
-# name: "Ensemble-5"
-# params:
-#   model: "ensemble"
-#   members: 5
-#   lr: 0.001
-#   epochs: 20
+---
+name: "Ensemble-5"
+params:
+  model: "ensemble"
+  members: 5
+  lr: 0.001
+  epochs: 30
 
-# ---
-# name: "SWAG"
-# params:
-#   model: "swag"
-#   swag_config:
-#     deviation_samples: 30
-#     mean_samples: 30
-#     start_epoch: 15
-#   lr: 0.001
-#   epochs: 20
+---
+name: "SWAG"
+params:
+  model: "swag"
+  swag_config:
+    deviation_samples: 30
+    mean_samples: 30
+    start_epoch: 20
+  lr: 0.001
+  epochs: 30
 
-# ---
-# name: "MultiSWAG"
-# params:
-#   model: "multi_swag"
-#   members: 5
-#   swag_config:
-#     deviation_samples: 30
-#     mean_samples: 30
-#     start_epoch: 15
-#   lr: 0.001
-#   epochs: 20
+---
+name: "MultiSWAG"
+params:
+  model: "multi_swag"
+  members: 5
+  swag_config:
+    deviation_samples: 30
+    mean_samples: 30
+    start_epoch: 20
+  lr: 0.001
+  epochs: 30
 
-# ---
-# name: "MCDropout"
-# params:
-#   model: "mc_dropout"
-#   p: 0.2
-#   lr: 0.001
-#   epochs: 20
+---
+name: "MCDropout"
+params:
+  model: "mc_dropout"
+  p: 0.2
+  lr: 0.001
+  epochs: 30
 
-# ---
-# name: "MultiMCDropout"
-# params:
-#   model: "multi_mc_dropout"
-#   members: 5
-#   p: 0.2
-#   lr: 0.001
-#   epochs: 20
+---
+name: "MultiMCDropout"
+params:
+  model: "multi_mc_dropout"
+  members: 5
+  p: 0.2
+  lr: 0.001
+  epochs: 30
 
-# ---
-# name: "MFVI"
-# params:
-#   model: "mfvi"
-#   lr: 0.001
-#   epochs: 20,
-#   mc_samples: 2,
-#   kl_rescaling: 0.2
+---
+name: "MFVI"
+params:
+  model: "mfvi"
+  lr: 0.001
+  epochs: 30
+  mc_samples: 2
+  kl_rescaling: 0.2
 
-# ---
-# name: "MultiMFVI"
-# params:
-#   model: "multi_mfvi"
-#   members: 5
-#   lr: 0.001
-#   epochs: 20,
-#   mc_samples: 2,
-#   kl_rescaling: 0.2
+---
+name: "MultiMFVI"
+params:
+  model: "multi_mfvi"
+  members: 5
+  lr: 0.001
+  epochs: 30
+  mc_samples: 2
+  kl_rescaling: 0.2

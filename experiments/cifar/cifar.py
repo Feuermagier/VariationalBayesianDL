@@ -33,14 +33,6 @@ def run(device, config, out_path, log):
         trained_model = run_swag(device, trainloader, config)
     elif model == "multi_swag":
         trained_model = run_multi_swag(device, trainloader, config)
-    elif model == "mc_dropout":
-        trained_model = run_mc_dropout(device, trainloader, config)
-    elif model == "multi_mc_dropout":
-        trained_model = run_multi_mc_dropout(device, trainloader, config)
-    elif model == "mfvi":
-        trained_model = run_mfvi(device, trainloader, config)
-    elif model == "multi_mfvi":
-        trained_model = run_multi_mfvi(device, trainloader, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -66,7 +58,7 @@ def run_map(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 def run_ensemble(device, trainloader, config):
