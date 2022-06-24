@@ -215,11 +215,11 @@ def run_multi_mc_dropout(device, trainloader, init_std, config):
 def run_mfvi(device, trainloader, init_std, config):
     prior = GaussianPrior(0, 1)
     layers = [
-        ("v_fc", (123, 250, prior)),
+        ("v_fc", (123, 250, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 250, prior)),
+        ("v_fc", (250, 250, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 1, prior)),
+        ("v_fc", (250, 1, prior, {})),
         ("gauss", (init_std, True)),
     ]
 
@@ -232,11 +232,11 @@ def run_multi_mfvi(device, trainloader, init_std, config):
     members = config["members"]
     prior = GaussianPrior(0, 1)
     layers = [
-        ("v_fc", (123, 250, prior)),
+        ("v_fc", (123, 250, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 250, prior)),
+        ("v_fc", (250, 250, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 1, prior)),
+        ("v_fc", (250, 1, prior, {})),
         ("gauss", (init_std, True)),
     ]
 

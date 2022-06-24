@@ -48,8 +48,10 @@ def run(device, config, out_path, log):
         testloader = cifar.cifar10_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
         CIFARResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
-    if "corrupted" in config["eval"]:
-        raise NotImplementedError()
+    for i in config["intensities"]:
+        testloader = cifar.cifar10_corrupted_testloader(config["data_path"], i, config["batch_size"], exclude_classes=classes)
+        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"C({i})", log)
+        CIFARResults(model, f"C({i})", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_{i}.pyc")
 
 def run_map(device, trainloader, config):
     layers = [

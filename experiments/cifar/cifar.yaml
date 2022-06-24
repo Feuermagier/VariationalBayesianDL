@@ -21,7 +21,7 @@ reps_in_parallel: 1
 params:
   batch_size: 20
   data_path: "../../data/"
-  eval: ["normal", "corrupted"]
+  intensities: [1, 3, 5]
   eval_samples: 100
   classes: []
 
