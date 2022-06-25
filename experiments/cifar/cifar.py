@@ -50,7 +50,7 @@ def run(device, config, out_path, log):
     CIFARResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
 
     for i in config["intensities"]:
-        testloader = cifar.cifar10_corrupted_testloader(config["data_path"], i, config["batch_size"], exclude_classes=classes)
+        testloader = cifar.cifar10_corrupted_testloader(config["data_path"], i, config["batch_size"])
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"C({i})", log)
         CIFARResults(model, f"C({i})", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_{i}.pyc")
 
@@ -72,7 +72,7 @@ def run_ensemble(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 def run_swag(device, trainloader, config):
@@ -84,7 +84,7 @@ def run_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 def run_multi_swag(device, trainloader, config):
@@ -97,7 +97,7 @@ def run_multi_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 
