@@ -1,0 +1,109 @@
+---
+# Slurm config
+name: "SLURM"
+partition: "gpu_4"
+job-name: "bdl-medmnist"
+num_parallel_jobs: 120
+ntasks: 1
+cpus-per-task: 1
+mem-per-cpu: 1000
+time: 120
+sbatch_args:
+  gres: "gpu:1"
+
+---
+name: "DEFAULT"
+path: "results"
+repetitions: 10
+reps_per_job: 1
+reps_in_parallel: 1
+
+params:
+  batch_size: 20
+  data_path: "../../data/"
+  dataset: "derma"
+  eval_samples: 100
+  classes: []
+  weight_decay: 0.0001
+
+---
+name: "MAP"
+params:
+  model: "map"
+  lr: 0.1
+  epochs: 30
+
+---
+name: "Ensemble-5"
+params:
+  model: "ensemble"
+  members: 5
+  lr: 0.1
+  epochs: 30
+
+---
+name: "SWAG"
+params:
+  model: "swag"
+  swag_config:
+    mean_samples: 30
+    deviation_samples: 30
+    start_epoch: 25
+  lr: 0.1
+  epochs: 30
+
+---
+name: "MultiSWAG"
+params:
+  model: "multi_swag"
+  members: 5
+  swag_config:
+    mean_samples: 30
+    deviation_samples: 30
+    start_epoch: 25
+  lr: 0.1
+  epochs: 30
+
+---
+name: "MCDropout"
+params:
+  model: "mc_dropout"
+  p: 0.2
+  lr: 0.1
+  epochs: 40
+  mc_samples: 1
+
+---
+name: "MultiMCDropout"
+params:
+  model: "multi_mc_dropout"
+  members: 5
+  p: 0.2
+  lr: 0.1
+  epochs: 40
+  mc_samples: 1
+
+---
+name: "VOGN"
+params:
+  model: "vogn"
+  vogn:
+    lr: 0.01
+    prior_prec: 50
+    damping: 0.0001
+    sample: True
+  mc_samples: 5
+  epochs: 30
+
+---
+name: "MultiVOGN"
+params:
+  model: "multi_vogn"
+  members: 5
+  vogn:
+    lr: 0.01
+    prior_prec: 50
+    damping: 0.0001
+    sample: True
+  mc_samples: 5
+  epochs: 30
