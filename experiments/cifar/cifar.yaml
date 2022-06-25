@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 180
+time: 400
 sbatch_args:
   gres: "gpu:1"
 
@@ -19,27 +19,26 @@ reps_per_job: 1
 reps_in_parallel: 1
 
 params:
-  batch_size: 20
+  batch_size: 128
   data_path: "../../data/"
   intensities: [1, 3, 5]
   eval_samples: 100
   classes: []
   weight_decay: 0.0001
+  epochs: 200
 
 ---
 name: "MAP"
 params:
   model: "map"
-  lr: 0.001
-  epochs: 50
+  lr: 0.05
 
 ---
 name: "Ensemble-5"
 params:
   model: "ensemble"
   members: 5
-  lr: 0.001
-  epochs: 50
+  lr: 0.05
 
 ---
 name: "SWAG"
@@ -49,8 +48,7 @@ params:
     deviation_samples: 30
     mean_samples: 30
     start_epoch: 40
-  lr: 0.001
-  epochs: 50
+  lr: 0.05
 
 ---
 name: "MultiSWAG"
@@ -61,23 +59,20 @@ params:
     deviation_samples: 30
     mean_samples: 30
     start_epoch: 40
-  lr: 0.001
-  epochs: 50
+  lr: 0.05
 
 
-# ---
-# name: "MCDropout"
-# params:
-#   model: "mc_dropout"
-#   p: 0.1
-#   lr: 0.001
-#   epochs: 50
+---
+name: "MCDropout"
+params:
+  model: "mc_dropout"
+  p: 0.1
+  lr: 0.05
 
-# ---
-# name: "MultiMCDropout"
-# params:
-#   model: "multi_mc_dropout"
-#   members: 5
-#   p: 0.1
-#   lr: 0.001
-#   epochs: 50
+---
+name: "MultiMCDropout"
+params:
+  model: "multi_mc_dropout"
+  members: 5
+  p: 0.1
+  lr: 0.05

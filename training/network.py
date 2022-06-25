@@ -22,7 +22,7 @@ def map_activation(name):
     else:
         raise ValueError(f"Unknown activation function {name}")
 
-def generate_model(architecture, print_summary=False):
+def generate_model(architecture, print_summary=False, parallel=False):
     layers = []
     for i, (ty, size) in enumerate(architecture):
         if ty == "pool":
@@ -69,5 +69,8 @@ def generate_model(architecture, print_summary=False):
     if print_summary:
         print(f"Generated model: {model}")
         print(f"{sum([p.numel() for p in model.parameters() if p.requires_grad])} trainable parameters")
-        
-    return model
+
+    if parallel:
+        return nn.DistributedDataParallel(model)
+    else:
+        return model
