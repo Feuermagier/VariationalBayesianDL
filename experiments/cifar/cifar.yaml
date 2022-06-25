@@ -25,7 +25,7 @@ params:
   eval_samples: 100
   classes: []
   weight_decay: 0.0001
-  epochs: 200
+  epochs: 300
 
 ---
 name: "MAP"
