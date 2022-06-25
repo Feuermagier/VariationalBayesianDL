@@ -2,7 +2,7 @@
 # Slurm config
 name: "SLURM"
 partition: "single"
-job-name: "bdl-uci"
+job-name: "bdl-weather"
 num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2

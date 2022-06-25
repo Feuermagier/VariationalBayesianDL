@@ -8,7 +8,7 @@ from cw2 import experiment, cw_error, cluster_work
 from cw2.cw_data import cw_logging
 
 from experiments.base import mnist
-from experiments.fmnist.results import FMNISTResults
+from experiments.medmnist.results import MedMNISTResults
 import experiments.base.multiclass_classification as exp
 from training.util import sgd
 from training.pp import MAP
@@ -21,31 +21,33 @@ def run(device, config, out_path, log):
     class_exclusion = config["classes"]
     if class_exclusion != []:
         log.info(f"Excluding classes {class_exclusion} from training")
-    trainloader = mnist.fashion_trainloader(config["data_path"], config["batch_size"], exclude_classes=class_exclusion)
+    dataset = config["dataset"]
+    trainloader = mnist.medmnist_trainloader(config["data_path"], dataset, config["batch_size"], exclude_classes=class_exclusion)
+    classes = mnist.medmnist_classes[dataset]
 
     model = config["model"]
 
     before = time.time()
     if model == "map":
-        trained_model = run_map(device, trainloader, config)
+        trained_model = run_map(device, trainloader, classes, config)
     elif model == "ensemble":
-        trained_model = run_ensemble(device, trainloader, config)
+        trained_model = run_ensemble(device, trainloader, classes, config)
     elif model == "swag":
-        trained_model = run_swag(device, trainloader, config)
+        trained_model = run_swag(device, trainloader, classes, config)
     elif model == "multi_swag":
-        trained_model = run_multi_swag(device, trainloader, config)
+        trained_model = run_multi_swag(device, trainloader, classes, config)
     elif model == "mc_dropout":
-        trained_model = run_mc_dropout(device, trainloader, config)
+        trained_model = run_mc_dropout(device, trainloader, classes, config)
     elif model == "multi_mc_dropout":
-        trained_model = run_multi_mc_dropout(device, trainloader, config)
+        trained_model = run_multi_mc_dropout(device, trainloader, classes, config)
     elif model == "mfvi":
-        trained_model = run_mfvi(device, trainloader, config)
+        trained_model = run_mfvi(device, trainloader, classes, config)
     elif model == "multi_mfvi":
-        trained_model = run_multi_mfvi(device, trainloader, config)
+        trained_model = run_multi_mfvi(device, trainloader, classes, config)
     elif model == "vogn":
-        trained_model = run_vogn(device, trainloader, config)
+        trained_model = run_vogn(device, trainloader, classes, config)
     elif model == "multi_vogn":
-        trained_model = run_multi_vogn(device, trainloader, config)
+        trained_model = run_multi_vogn(device, trainloader, classes, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -55,18 +57,14 @@ def run(device, config, out_path, log):
     #torch.save(trained_model.state_dict(), out_path + "model.tar")
 
     classes = [i for i in range(10) if i not in class_exclusion] if class_exclusion != [] else []
-    if "normal" in config["eval"]:
-        if class_exclusion != []:
-            log.info(f"Evaluating only on classes {class_exclusion}")
-        testloader = mnist.fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
-        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
-        FMNISTResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
-    if "corrupted" in config["eval"]:
-        testloader = mnist.corrupted_fashion_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
-        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "corrupted", log)
-        FMNISTResults(model, "corrupted", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_corrupted.pyc")
+    if class_exclusion != []:
+        log.info(f"Evaluating only on classes {class_exclusion}")
+    testloader = mnist.medmnist_testloader(config["data_path"], dataset, config["batch_size"], exclude_classes=classes)
+    acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, dataset, log)
+    MedMNISTResults(model, dataset, acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_{dataset}.pyc")
 
-def run_map(device, trainloader, config):
+
+def run_map(device, trainloader, classes, config):
     layers = [
         ("conv", (1, 6, 5)),
         ("relu", ()),
@@ -79,7 +77,7 @@ def run_map(device, trainloader, config):
         ("relu", ()),
         ("fc", (120, 84)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -87,7 +85,7 @@ def run_map(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
-def run_ensemble(device, trainloader, config):
+def run_ensemble(device, trainloader, classes, config):
     members = config["members"]
     layers = [
         ("conv", (1, 6, 5)),
@@ -101,7 +99,7 @@ def run_ensemble(device, trainloader, config):
         ("relu", ()),
         ("fc", (120, 84)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -109,7 +107,7 @@ def run_ensemble(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
-def run_swag(device, trainloader, config):
+def run_swag(device, trainloader, classes, config):
     layers = [
         ("conv", (1, 6, 5)),
         ("relu", ()),
@@ -122,7 +120,7 @@ def run_swag(device, trainloader, config):
         ("relu", ()),
         ("fc", (120, 84)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -132,7 +130,7 @@ def run_swag(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
-def run_multi_swag(device, trainloader, config):
+def run_multi_swag(device, trainloader, classes, config):
     members = config["members"]
     layers = [
         ("conv", (1, 6, 5)),
@@ -146,7 +144,7 @@ def run_multi_swag(device, trainloader, config):
         ("relu", ()),
         ("fc", (120, 84)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -156,7 +154,7 @@ def run_multi_swag(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
-def run_mc_dropout(device, trainloader, config):
+def run_mc_dropout(device, trainloader, classes, config):
     p = config["p"]
     layers = [
         ("conv", (1, 6, 5)),
@@ -174,7 +172,7 @@ def run_mc_dropout(device, trainloader, config):
         ("fc", (120, 84)),
         ("dropout", (p,)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -182,7 +180,7 @@ def run_mc_dropout(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
-def run_multi_mc_dropout(device, trainloader, config):
+def run_multi_mc_dropout(device, trainloader, classes, config):
     members = config["members"]
     p = config["p"]
     layers = [
@@ -201,7 +199,7 @@ def run_multi_mc_dropout(device, trainloader, config):
         ("fc", (120, 84)),
         ("dropout", (p,)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -209,7 +207,7 @@ def run_multi_mc_dropout(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
-def run_mfvi(device, trainloader, config):
+def run_mfvi(device, trainloader, classes, config):
     prior = GaussianPrior(0, 1)
     layers = [
         ("v_conv", (1, 6, 5, prior, {})),
@@ -223,7 +221,7 @@ def run_mfvi(device, trainloader, config):
         ("relu", ()),
         ("v_fc", (120, 84, prior, {})),
         ("relu", ()),
-        ("v_fc", (84, 10, prior, {})),
+        ("v_fc", (84, classes, prior, {})),
         ("logsoftmax", ())
     ]
 
@@ -231,7 +229,7 @@ def run_mfvi(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_multi_mfvi(device, trainloader, config):
+def run_multi_mfvi(device, trainloader, classes, config):
     members = config["members"]
     prior = GaussianPrior(0, 1)
     layers = [
@@ -246,7 +244,7 @@ def run_multi_mfvi(device, trainloader, config):
         ("relu", ()),
         ("v_fc", (120, 84, prior, {})),
         ("relu", ()),
-        ("v_fc", (84, 10, prior, {})),
+        ("v_fc", (84, classes, prior, {})),
         ("logsoftmax", ())
     ]
 
@@ -254,7 +252,7 @@ def run_multi_mfvi(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_vogn(device, trainloader, config):
+def run_vogn(device, trainloader, classes, config):
     layers = [
         ("conv", (1, 6, 5)),
         ("relu", ()),
@@ -267,7 +265,7 @@ def run_vogn(device, trainloader, config):
         ("relu", ()),
         ("fc", (120, 84)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -275,7 +273,7 @@ def run_vogn(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
-def run_multi_vogn(device, trainloader, config):
+def run_multi_vogn(device, trainloader, classes, config):
     members = config["members"]
     layers = [
         ("conv", (1, 6, 5)),
@@ -289,7 +287,7 @@ def run_multi_vogn(device, trainloader, config):
         ("relu", ()),
         ("fc", (120, 84)),
         ("relu", ()),
-        ("fc", (84, 10)),
+        ("fc", (84, classes)),
         ("logsoftmax", ())
     ]
 
@@ -298,7 +296,7 @@ def run_multi_vogn(device, trainloader, config):
     return model
 
 ####################### CW2 #####################################
-class FashionMNISTExperiment(experiment.AbstractExperiment):
+class MedMNISTExperiment(experiment.AbstractExperiment):
     def initialize(self, config: dict, rep: int, logger: cw_logging.LoggerArray) -> None:
         pass
 
@@ -320,5 +318,5 @@ class FashionMNISTExperiment(experiment.AbstractExperiment):
         pass
 
 if __name__ == "__main__":
-    cw = cluster_work.ClusterWork(FashionMNISTExperiment)
+    cw = cluster_work.ClusterWork(MedMNISTExperiment)
     cw.run()
