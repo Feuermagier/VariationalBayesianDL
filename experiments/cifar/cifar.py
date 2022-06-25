@@ -39,7 +39,7 @@ def run(device, config, out_path, log):
     after = time.time()
     log.info(f"Time: {after - before}s")
 
-    #torch.save(trained_model.state_dict(), out_path + "model.tar")
+    torch.save(trained_model.state_dict(), out_path + "model.tar")
 
     classes = [i for i in range(10) if i not in class_exclusion] if class_exclusion != [] else []
 
