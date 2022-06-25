@@ -33,6 +33,10 @@ def run(device, config, out_path, log):
         trained_model = run_swag(device, trainloader, config)
     elif model == "multi_swag":
         trained_model = run_multi_swag(device, trainloader, config)
+    elif model == "mcd":
+        trained_model = run_mcd(device, trainloader, config)
+    elif model == "multi_mcd":
+        trained_model = run_multi_mcd(device, trainloader, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -100,7 +104,26 @@ def run_multi_swag(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
+def run_mcd(device, trainloader, config):
+    layers = [
+        ("drop-preresnet-20", (32, 3, 10, config["p"])),
+        ("logsoftmax", ())
+    ]
 
+    model = MAP(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    return model
+
+def run_multi_mcd(device, trainloader, config):
+    members = config["members"]
+    layers = [
+        ("drop-preresnet-20", (32, 3, 10, config["p"])),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([MAP(layers) for _ in range(members)])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    return model
 
 ####################### CW2 #####################################
 class FashionMNISTExperiment(experiment.AbstractExperiment):

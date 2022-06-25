@@ -65,14 +65,14 @@ params:
 ---
 name: "MCDropout"
 params:
-  model: "mc_dropout"
+  model: "mcd"
   p: 0.1
   lr: 0.05
 
 ---
 name: "MultiMCDropout"
 params:
-  model: "multi_mc_dropout"
+  model: "multi_mcd"
   members: 5
   p: 0.1
   lr: 0.05
