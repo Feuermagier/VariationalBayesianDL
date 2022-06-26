@@ -52,7 +52,7 @@ def cifar10_corrupted_testloader(path, intensity, batch_size, shuffle=True):
         if file == "labels.npy":
             continue
 
-        tensors = torch.from_numpy(np.load("/mnt/d/Uni/Bachelorarbeit/linux/data/CIFAR-10-C/" + file)).float() / 256
+        tensors = torch.from_numpy(np.load(path + "CIFAR-10-C/" + file)).float() / 256
         data = tensors[intensity * 10000:(intensity+1) * 10000].permute((0, 3, 1, 2))
         data = normalize(data)
         single_datasets.append(TensorDataset(data, labels[intensity * 10000:(intensity+1) * 10000]))
