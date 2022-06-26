@@ -33,14 +33,14 @@ params:
 name: "MAP"
 params:
   model: "map"
-  lr: 0.05
+  lr: 0.1
 
 ---
 name: "Ensemble-5"
 params:
   model: "ensemble"
   members: 5
-  lr: 0.05
+  lr: 0.1
 
 ---
 name: "SWAG"
@@ -50,7 +50,7 @@ params:
     deviation_samples: 30
     mean_samples: 50
     start_epoch: 150
-  lr: 0.05
+  lr: 0.1
 
 ---
 name: "MultiSWAG"
@@ -61,7 +61,7 @@ params:
     deviation_samples: 30
     mean_samples: 50
     start_epoch: 150
-  lr: 0.05
+  lr: 0.1
 
 
 ---
@@ -69,7 +69,7 @@ name: "MCDropout"
 params:
   model: "mcd"
   p: 0.1
-  lr: 0.05
+  lr: 0.1
 
 ---
 name: "MultiMCDropout"
@@ -77,4 +77,4 @@ params:
   model: "multi_mcd"
   members: 5
   p: 0.1
-  lr: 0.05
+  lr: 0.1
