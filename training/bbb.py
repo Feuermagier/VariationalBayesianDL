@@ -27,18 +27,17 @@ class BBBModel(nn.Module):
         self.model.load_state_dict(dict["model"])
         self.losses = dict["losses"]
 
-    def train_model(self, epochs, data_loss_fn, optimizer_factory, loader, batch_size, device, mc_samples=5, kl_rescaling=1, report_every_epochs=1):
+    def train_model(self, epochs, data_loss_fn, optimizer_factory, loader, batch_size, device, mc_samples=5, kl_rescaling=1, scheduler_factory=None, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
         optimizer = optimizer_factory(self.model.parameters())
+        scheduler = scheduler_factory(optimizer) if scheduler_factory is not None else None
         pi = kl_rescaling / len(loader)
 
         # kl_grads = []
         # data_grads = []
         for epoch in range(epochs):
-            epoch_loss = torch.tensor(0.0)
-            epoch_kl_loss = torch.tensor(0.0)
-            epoch_data_loss = torch.tensor(0.0)
+            epoch_loss = torch.tensor(0, dtype=torch.float)
             for data, target in loader:
                 data, target = data.to(device), target.to(device)
                 optimizer.zero_grad()
@@ -66,13 +65,11 @@ class BBBModel(nn.Module):
                 #nn.utils.clip_grad.clip_grad_norm_(self.model.parameters(), 10)
                 optimizer.step()
                 epoch_loss += loss.cpu().item()
-                epoch_kl_loss += (pi * kl_loss).cpu().detach() / mc_samples
-                epoch_data_loss += (data_loss).cpu().detach() / mc_samples
-            epoch_loss /= len(loader)
-            epoch_kl_loss /= len(loader)
+            epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
-            self.kl_losses.append(epoch_kl_loss.detach() / mc_samples)
-            self.data_losses.append(epoch_data_loss.detach() / mc_samples)
+
+            if scheduler is not None:
+                scheduler.step()
 
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")

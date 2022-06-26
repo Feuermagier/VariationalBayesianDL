@@ -10,7 +10,7 @@ from cw2.cw_data import cw_logging
 from experiments.base import cifar
 from experiments.cifar.results import CIFARResults
 import experiments.base.multiclass_classification as exp
-from training.util import sgd
+from training.util import sgd, lr_scheduler
 from training.pp import MAP
 from training.ensemble import Ensemble
 from training.bbb import BBBModel, GaussianPrior
@@ -65,7 +65,7 @@ def run_map(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
     return model
 
 def run_ensemble(device, trainloader, config):
@@ -76,7 +76,7 @@ def run_ensemble(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
     return model
 
 def run_swag(device, trainloader, config):
@@ -88,7 +88,7 @@ def run_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
     return model
 
 def run_multi_swag(device, trainloader, config):
@@ -101,7 +101,7 @@ def run_multi_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
     return model
 
 def run_mcd(device, trainloader, config):
@@ -111,7 +111,7 @@ def run_mcd(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
     return model
 
 def run_multi_mcd(device, trainloader, config):
@@ -122,7 +122,7 @@ def run_multi_mcd(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################

@@ -24,6 +24,9 @@ def nll_loss(output, target, eps: float = 1e-6,):
     loss = 0.5 * (torch.log(var) + (mean - target)**2 / var)
     return loss.mean()
 
+def lr_scheduler(milestones, gamma):
+    return lambda opt: torch.optim.lr_scheduler.MultiStepLR(opt, milestones, gamma)
+
 # Weighted sum of two gaussian distributions
 class GaussianMixture:
     def __init__(self, pi, sigma1, sigma2):

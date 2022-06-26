@@ -26,10 +26,11 @@ class RMSModule(nn.Module):
         self.anchor = dict["anchor"]
         self.losses = dict["losses"]
 
-    def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, report_every_epochs=1):
+    def train_model(self, epochs, loss_fn, optimizer_factory, loader, batch_size, device, scheduler_factory=None, report_every_epochs=1):
         self.model.to(device)
         self.model.train()
         optimizer = optimizer_factory(self.model.parameters())
+        scheduler = scheduler_factory(optimizer) if scheduler_factory is not None else None
 
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)
@@ -43,8 +44,12 @@ class RMSModule(nn.Module):
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.cpu().item()
-            epoch_loss /= len(loader)
+            epoch_loss /= (len(loader) * batch_size)
             self.losses.append(epoch_loss.detach())
+
+            if scheduler is not None:
+                scheduler.step()
+
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")
         if report_every_epochs >= 0:
