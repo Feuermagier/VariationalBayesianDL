@@ -21,7 +21,7 @@ reps_in_parallel: 1
 params:
   batch_size: 128
   data_path: "../../data/"
-  intensities: [1, 3, 5]
+  intensities: [0, 2, 4] # 0 == intensity 1, ...
   eval_samples: 100
   classes: []
   weight_decay: 0.0001
