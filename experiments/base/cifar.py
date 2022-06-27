@@ -24,10 +24,13 @@ transform_test = transforms.Compose([
 ])
 
 
-def cifar10_trainloader(path, batch_size: int = 4, shuffle: bool = True, exclude_classes = []):
+def cifar10_trainloader(path, batch_size: int = 4, shuffle: bool = True, exclude_classes = [], subsample=None):
     dataset = torchvision.datasets.CIFAR10(root=path, train=True, download=True, transform=transform_train)
     dataset.targets = torch.tensor(dataset.targets)
     _select_classes(dataset, exclude_classes)
+    if subsample is not None:
+        dataset.targets = dataset.targets[0:subsample]
+        dataset.data = dataset.data[0:subsample]
     return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
 
 def cifar10_testloader(path, batch_size: int = 4, shuffle: bool = True, exclude_classes = []):
