@@ -58,6 +58,12 @@ def run(device, config, out_path, log):
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"C({i})", log)
         CIFARResults(model, f"C({i})", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_{i}.pyc")
 
+def optimizer(config):
+    return sgd(config["lr"], weight_decay=config["weight_decay"], momentum=config["momentum"], nesterov=config["nesterov"])
+
+def schedule(config):
+    lr_scheduler(config["lr_milestones"], config["lr_decay"])
+
 def run_map(device, trainloader, config):
     layers = [
         ("preresnet-20", (32, 3, 10)),
@@ -65,7 +71,7 @@ def run_map(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
     return model
 
 def run_ensemble(device, trainloader, config):
@@ -76,7 +82,7 @@ def run_ensemble(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
     return model
 
 def run_swag(device, trainloader, config):
@@ -88,7 +94,7 @@ def run_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
     return model
 
 def run_multi_swag(device, trainloader, config):
@@ -101,7 +107,7 @@ def run_multi_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
     return model
 
 def run_mcd(device, trainloader, config):
@@ -111,7 +117,7 @@ def run_mcd(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
     return model
 
 def run_multi_mcd(device, trainloader, config):
@@ -122,7 +128,7 @@ def run_multi_mcd(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), sgd(config["lr"], weight_decay=config["weight_decay"]), trainloader, config["batch_size"], device, scheduler_factory=lr_scheduler(config["lr_milestones"], config["lr_decay"]), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################

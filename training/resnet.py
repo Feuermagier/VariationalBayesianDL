@@ -15,6 +15,9 @@ class PreBasicBlock(nn.Module):
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
         )
 
+        nn.init.kaiming_normal_(self.main_path[2].weight.data)
+        nn.init.kaiming_normal_(self.main_path[5].weight.data)
+
         if stride != 1:
             self.skip_path = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False)
         else:
@@ -32,11 +35,14 @@ class PreResNet(nn.Module):
 
             PreBasicBlock(16, 16, 1),
             PreBasicBlock(16, 16, 1),
+            PreBasicBlock(16, 16, 1),
 
             PreBasicBlock(16, 32, 2),
             PreBasicBlock(32, 32, 1),
+            PreBasicBlock(32, 32, 1),
 
             PreBasicBlock(32, 64, 2),
+            PreBasicBlock(64, 64, 1),
             PreBasicBlock(64, 64, 1),
 
             nn.BatchNorm2d(64, track_running_stats=False),
