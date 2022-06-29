@@ -112,20 +112,27 @@ class ClassificationCalibrationResults:
 
         return sece
 
-    def plot_reliability(self, ax, include_text=True, title=None):
+    def plot_reliability(self, ax, include_text=True, title=None, fractions=True, actual_confidences=False):
         ax.set_xlabel("Confidence", fontsize=14)
         ax.set_ylabel("Accuracy", fontsize=14)
-        ax.plot([0, 1], [0,1], color="royalblue")
-        ax.plot(self.bin_confidences, self.bin_accuracys, "o-", color="darkorange")
         ax.set_xlim(0, 1)
-        ax.set_xticks(self.bin_confidences)
+        ax.plot([0, 1], [0,1], color="royalblue")
+        
+        if actual_confidences:
+            conf_points = self.bin_confidences
+        else:
+            offset = 1 / len(self.bin_counts) / 2
+            conf_points = torch.linspace(offset, 1 - offset, len(self.bin_counts))
+
+        ax.plot(conf_points, self.bin_accuracys, "o-", color="darkorange")
+        ax.set_xticks(conf_points)
         ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.2f"))
         ax.set_ylim(0, 1)
         ax.xaxis.grid(True, linestyle="-")
 
         count_ax = ax.twiny()
-        count_ax.set_xticklabels(self.bin_counts)
-        count_ax.set_xticks(self.bin_confidences)
+        count_ax.set_xticks(conf_points)
+        count_ax.set_xticklabels([f"{(c / sum(self.bin_counts)):.2f}" if fractions else f"{c}" for c in self.bin_counts])
         count_ax.set_xlabel("Datapoints", fontsize=14)
 
         if include_text:

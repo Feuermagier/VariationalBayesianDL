@@ -91,11 +91,14 @@ class DropoutPreResNet(nn.Module):
 
             DropoutPreBasicBlock(16, 16, p, 1),
             DropoutPreBasicBlock(16, 16, p, 1),
+            DropoutPreBasicBlock(16, 16, p, 1),
 
             DropoutPreBasicBlock(16, 32, p, 2),
             DropoutPreBasicBlock(32, 32, p, 1),
+            DropoutPreBasicBlock(32, 32, p, 1),
 
             DropoutPreBasicBlock(32, 64, p, 2),
+            DropoutPreBasicBlock(64, 64, p, 1),
             DropoutPreBasicBlock(64, 64, p, 1),
 
             nn.BatchNorm2d(64, track_running_stats=False),
