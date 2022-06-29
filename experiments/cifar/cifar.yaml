@@ -31,39 +31,39 @@ params:
   momentum: 0.9
   nesterov: True
 
----
-name: "MAP"
-params:
-  model: "map"
-  lr: 0.1
+# ---
+# name: "MAP"
+# params:
+#   model: "map"
+#   lr: 0.1
 
----
-name: "Ensemble-5"
-params:
-  model: "ensemble"
-  members: 5
-  lr: 0.1
+# ---
+# name: "Ensemble-5"
+# params:
+#   model: "ensemble"
+#   members: 5
+#   lr: 0.1
 
----
-name: "SWAG"
-params:
-  model: "swag"
-  swag_config:
-    deviation_samples: 30
-    mean_samples: 50
-    start_epoch: 150
-  lr: 0.1
+# ---
+# name: "SWAG"
+# params:
+#   model: "swag"
+#   swag_config:
+#     deviation_samples: 30
+#     mean_samples: 50
+#     start_epoch: 150
+#   lr: 0.1
 
----
-name: "MultiSWAG"
-params:
-  model: "multi_swag"
-  members: 5
-  swag_config:
-    deviation_samples: 30
-    mean_samples: 50
-    start_epoch: 150
-  lr: 0.1
+# ---
+# name: "MultiSWAG"
+# params:
+#   model: "multi_swag"
+#   members: 5
+#   swag_config:
+#     deviation_samples: 30
+#     mean_samples: 50
+#     start_epoch: 150
+#   lr: 0.1
 
 
 ---

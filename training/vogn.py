@@ -162,6 +162,7 @@ def ivon_init(parameters, N, init):
 
 def ivon_prepare(parameters, states):
     perturbed_params = []
+    noises = []
     for param, state in zip(parameters, states):
         if state["scale"] is not None:
             std = (1 / (state["N"] * state["scale"] + state["damping"])).sqrt()
@@ -169,12 +170,13 @@ def ivon_prepare(parameters, states):
         else:
             noise = torch.zeros_like(param)
         perturbed_params.append(param + noise)
-    return perturbed_params, noise
+        noises.append(noise)
+    return perturbed_params, noises
 
-def ivon_step(parameters, grads, states, noise):
+def ivon_step(parameters, grads, states, noises):
     new_parameters = []
     with torch.no_grad():
-        for grad, param, state in zip(grads, parameters, states):
+        for grad, param, state, noise in zip(grads, parameters, states, noises):
             state["step"] += 1
             t = state["step"]
             beta1, beta2 = state["betas"]
@@ -232,8 +234,8 @@ class iVONModuleFunctorch(nn.Module):
         self.optim_state = ivon_init(self.params, len(loader) * batch_size, optim_params)
 
         def get_loss(parameters, input, target):
-            input = input.unsqueeze(0)
-            target = target.unsqueeze(0)
+            #input = input.unsqueeze(0)
+            #target = target.unsqueeze(0)
             output = self.model(parameters, self.buffs, input)
             loss = loss_fn(output, target)
             return loss
@@ -246,7 +248,7 @@ class iVONModuleFunctorch(nn.Module):
             epoch_loss = torch.tensor(0, dtype=torch.float)
             for data, target in loader:
                 data, target = data.to(device), target.to(device)
-                data, target = data.expand(mc_samples, -1, -1), target.expand(mc_samples, -1, -1)
+                data, target = data.expand(mc_samples, *data.shape), target.expand(mc_samples, *target.shape)
                 
                 (grads, loss), noise = vmap(run_sample, (None, None, 0, 0), randomness="different")(self.params, self.optim_state, data, target)
                 loss = loss.mean()
@@ -264,7 +266,7 @@ class iVONModuleFunctorch(nn.Module):
         def sample_single(model, params, buffers, input):
             perturbed_params, _ = ivon_prepare(params, self.optim_state)
             return model(perturbed_params, buffers, input)
-        o = vmap(sample_single, in_dims=(None, None, None, 0), randomness="different")(self.model, self.params, self.buffs, input.expand(samples, -1, -1))
+        o = vmap(sample_single, in_dims=(None, None, None, 0), randomness="different")(self.model, self.params, self.buffs, input.expand(samples, *input.shape))
         return o.squeeze(1)
 
     def forward(self, input, samples=1):
