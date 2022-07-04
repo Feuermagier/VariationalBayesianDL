@@ -10,7 +10,7 @@ from cw2.cw_data import cw_logging
 from experiments.base import cifar
 from experiments.cifar.results import CIFARResults
 import experiments.base.multiclass_classification as exp
-from training.util import sgd, lr_scheduler
+from training.util import sgd, lr_scheduler, wilson_scheduler
 from training.pp import MAP
 from training.ensemble import Ensemble
 from training.bbb import BBBModel, GaussianPrior
@@ -58,11 +58,17 @@ def run(device, config, out_path, log):
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"C({i})", log)
         CIFARResults(model, f"C({i})", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_{i}.pyc")
 
+    if config["stl10"]:
+        testloader = cifar.stl10_testloader(config["data_path"], i, config["batch_size"])
+        acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"STL10", log)
+        CIFARResults(model, f"STL10", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_stl10.pyc")
+
 def optimizer(config):
     return sgd(config["lr"], weight_decay=config["weight_decay"], momentum=config["momentum"], nesterov=config["nesterov"])
 
 def schedule(config):
-    lr_scheduler(config["lr_milestones"], config["lr_decay"])
+    # return lr_scheduler(config["lr_milestones"], config["lr_decay"])
+    return wilson_scheduler(config["epochs"], config["lr"], None)
 
 def run_map(device, trainloader, config):
     layers = [
@@ -94,7 +100,8 @@ def run_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
+    scheduler = wilson_scheduler(swag_config["start_epoch"], config["lr"], swag_config["lr"])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=scheduler, report_every_epochs=1)
     return model
 
 def run_multi_swag(device, trainloader, config):
@@ -107,7 +114,8 @@ def run_multi_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
+    scheduler = wilson_scheduler(swag_config["start_epoch"], config["lr"], swag_config["lr"])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=scheduler, report_every_epochs=1)
     return model
 
 def run_mcd(device, trainloader, config):
@@ -129,6 +137,29 @@ def run_multi_mcd(device, trainloader, config):
 
     model = Ensemble([MAP(layers) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
+    return model
+
+def run_bbb(device, trainloader, config):
+    prior = GaussianPrior(torch.tensor(config["prior_mean"]), torch.tensor(config["prior_std"]))
+    layers = [
+        ("variational-preresnet-20", (32, 3, 10, prior)),
+        ("logsoftmax", ())
+    ]
+
+    model = BBBModel(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    return model
+
+def run_multi_bbb(device, trainloader, config):
+    members = config["members"]
+    prior = GaussianPrior(torch.tensor(config["prior_mean"]), torch.tensor(config["prior_std"]))
+    layers = [
+        ("variational-preresnet-20", (32, 3, 10, prior)),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([BBBModel(layers) for _ in range(members)])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################

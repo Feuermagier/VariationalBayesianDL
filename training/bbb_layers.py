@@ -124,6 +124,8 @@ class BBBConvolution(nn.Module):
         self.stride = kwargs.get("stride", 1)
         self.freeze_on_eval = kwargs.get("freeze_on_eval", True)
         self.kl_on_eval = kwargs.get("kl_on_eval", False)
+        self.bias = kwargs.get("bias", True)
+        self.padding = kwargs.get("padding", 0)
         self.out_channels, self.in_channels = out_channels, in_channels
         self.kernel_size = kernel_size
 
@@ -134,8 +136,9 @@ class BBBConvolution(nn.Module):
         self.weight_rho = nn.Parameter(torch.empty((self.out_channels, self.in_channels, self.kernel_size, self.kernel_size)).uniform_(-3, -3))
 
         # Biases
-        self.bias_mu = nn.Parameter(torch.empty(self.out_channels).normal_(0, 0.1))
-        self.bias_rho = nn.Parameter(torch.empty(self.out_channels).uniform_(-3, -3))
+        if self.bias:
+            self.bias_mu = nn.Parameter(torch.empty(self.out_channels).normal_(0, 0.1))
+            self.bias_rho = nn.Parameter(torch.empty(self.out_channels).uniform_(-3, -3))
 
         self.kl = 0
 
@@ -143,14 +146,15 @@ class BBBConvolution(nn.Module):
         self.kl = 0
 
         weight_sigma = to_sigma(self.weight_rho)
-        bias_sigma = to_sigma(self.bias_rho)
+        if self.bias:
+            bias_sigma = to_sigma(self.bias_rho)
 
         if self.sampling == "parameters":
             raise NotImplementedError()
         elif self.sampling == "activations":
 
-            activation_mu = F.conv2d(input, self.weight_mu, self.bias_mu, self.stride)
-            activation_var = F.conv2d(input**2, weight_sigma**2, bias_sigma**2, self.stride)
+            activation_mu = F.conv2d(input, self.weight_mu, self.bias_mu if self.bias else None, stride=self.stride, padding=self.padding)
+            activation_var = F.conv2d(input**2, weight_sigma**2, bias_sigma**2 if self.bias else None, stride=self.stride, padding=self.padding)
             activation_std = torch.sqrt(activation_var)
 
             if not self.training and self.freeze_on_eval:
@@ -160,10 +164,10 @@ class BBBConvolution(nn.Module):
             output = activation_mu + activation_std * epsilon
 
             if self.training or self.kl_on_eval:
-                weight_kl = self.weight_prior.kl_divergence(self.weight_mu, weight_sigma)
-                bias_kl = self.bias_prior.kl_divergence(self.bias_mu, bias_sigma)
-                self.kl = weight_kl + bias_kl
-
+                self.kl = self.weight_prior.kl_divergence(self.weight_mu, weight_sigma)
+                if self.bias:
+                    self.kl += self.bias_prior.kl_divergence(self.bias_mu, bias_sigma)
+                    
             return output
         else:
             raise ValueError("Invalid value of sampling")

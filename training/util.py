@@ -1,3 +1,4 @@
+from tabnanny import verbose
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -26,6 +27,19 @@ def nll_loss(output, target, eps: float = 1e-6,):
 
 def lr_scheduler(milestones, gamma):
     return lambda opt: torch.optim.lr_scheduler.MultiStepLR(opt, milestones, gamma)
+
+def wilson_scheduler(pretrain_epochs, lr_init, swag_lr=None):
+    def wilson_schedule(epoch):
+        t = (epoch) / pretrain_epochs
+        lr_ratio = swag_lr / lr_init if swag_lr is not None else 0.01
+        if t <= 0.5:
+            factor = 1.0
+        elif t <= 0.9:
+            factor = 1.0 - (1.0 - lr_ratio) * (t - 0.5) / 0.4
+        else:
+            factor = lr_ratio
+        return factor
+    return lambda opt: torch.optim.lr_scheduler.LambdaLR(opt, wilson_schedule)
 
 # Weighted sum of two gaussian distributions
 class GaussianMixture:

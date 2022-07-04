@@ -22,48 +22,51 @@ params:
   batch_size: 128
   data_path: "../../data/"
   intensities: [0, 2, 4] # 0 == intensity 1, ...
-  eval_samples: 100
+  eval_samples: 50
   classes: []
-  weight_decay: 0.0001
-  epochs: 160
-  lr_milestones: [80, 120]
-  lr_decay: 0.1
+  weight_decay: 0.0003
+  epochs: 300
+  #lr_milestones: [80, 120]
+  #lr_decay: 0.1
   momentum: 0.9
   nesterov: True
+  stl10: True
 
-# ---
-# name: "MAP"
-# params:
-#   model: "map"
-#   lr: 0.1
+---
+name: "MAP"
+params:
+  model: "map"
+  lr: 0.1
 
-# ---
-# name: "Ensemble-5"
-# params:
-#   model: "ensemble"
-#   members: 5
-#   lr: 0.1
+---
+name: "Ensemble-5"
+params:
+  model: "ensemble"
+  members: 5
+  lr: 0.1
 
-# ---
-# name: "SWAG"
-# params:
-#   model: "swag"
-#   swag_config:
-#     deviation_samples: 30
-#     mean_samples: 50
-#     start_epoch: 150
-#   lr: 0.1
+---
+name: "SWAG"
+params:
+  model: "swag"
+  swag_config:
+    deviation_samples: 30
+    mean_samples: 100
+    start_epoch: 161
+    lr: 0.01
+  lr: 0.1
 
-# ---
-# name: "MultiSWAG"
-# params:
-#   model: "multi_swag"
-#   members: 5
-#   swag_config:
-#     deviation_samples: 30
-#     mean_samples: 50
-#     start_epoch: 150
-#   lr: 0.1
+---
+name: "MultiSWAG"
+params:
+  model: "multi_swag"
+  members: 5
+  swag_config:
+    deviation_samples: 30
+    mean_samples: 100
+    start_epoch: 161
+    lr: 0.01
+  lr: 0.1
 
 
 ---
