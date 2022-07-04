@@ -59,7 +59,7 @@ def run(device, config, out_path, log):
         CIFARResults(model, f"C({i})", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_{i}.pyc")
 
     if config["stl10"]:
-        testloader = cifar.stl10_testloader(config["data_path"], i, config["batch_size"])
+        testloader = cifar.stl10_testloader(config["data_path"], config["batch_size"])
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"STL10", log)
         CIFARResults(model, f"STL10", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_stl10.pyc")
 
