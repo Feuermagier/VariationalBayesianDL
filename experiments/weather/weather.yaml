@@ -7,12 +7,12 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
 mem-per-cpu: 32000
-time: 300
+time: 600
 
 ---
 name: "DEFAULT"
 path: "results"
-repetitions: 2
+repetitions: 5
 reps_in_parallel: 1
 
 params:
@@ -20,6 +20,7 @@ params:
   data_path: "../../data/"
   eval_samples: 10
   init_std: 0.1
+  epochs: 100
   # early_stopping:
   #   interval: 1
   #   delta: 0.00001
@@ -30,15 +31,13 @@ name: "MAP"
 params:
   model: "map"
   lr: 0.003
-  epochs: 50
 
 ---
 name: "Ensemble-5"
 params:
   model: "ensemble"
   members: 5
-  lr: 0.001
-  epochs: 30
+  lr: 0.003
 
 ---
 name: "SWAG"
@@ -48,8 +47,7 @@ params:
     deviation_samples: 30
     mean_samples: 30
     start_epoch: 40
-  lr: 0.001
-  epochs: 50
+  lr: 0.003
 
 ---
 name: "MultiSWAG"
@@ -60,16 +58,14 @@ params:
     deviation_samples: 30
     mean_samples: 30
     start_epoch: 40
-  lr: 0.001
-  epochs: 50
+  lr: 0.003
 
 ---
 name: "MCDropout"
 params:
   model: "mc_dropout"
   p: 0.2
-  lr: 0.001
-  epochs: 40
+  lr: 0.003
 
 ---
 name: "MultiMCDropout"
@@ -77,15 +73,13 @@ params:
   model: "multi_mc_dropout"
   members: 5
   p: 0.2
-  lr: 0.001
-  epochs: 40
+  lr: 0.003
 
 ---
 name: "MFVI"
 params:
   model: "mfvi"
-  lr: 0.001
-  epochs: 50
+  lr: 0.003
   mc_samples: 2
   kl_rescaling: 0.2
 
@@ -94,7 +88,6 @@ name: "MultiMFVI"
 params:
   model: "multi_mfvi"
   members: 5
-  lr: 0.001
-  epochs: 50
+  lr: 0.003
   mc_samples: 2
   kl_rescaling: 0.2

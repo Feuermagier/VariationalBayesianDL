@@ -76,12 +76,6 @@ def run(device, config, out_path, log):
 
     torch.save(trained_model.state_dict(), out_path + f"model.tar")
 
-    # Plot loss
-    fig, ax = plt.subplots()
-    plot_losses(model, trained_model.all_losses(), ax)
-    fig.set_tight_layout(True)
-    fig.savefig(out_path + f"loss.pdf")
-
     # Eval in
     testloader = dataset.in_testloader(128)
     results = RegressionResults(testloader, model, trained_model.infer,
@@ -90,7 +84,7 @@ def run(device, config, out_path, log):
     log.info(f"In Mean MSE: {results.mean_mse}")
     log.info(f"In MSE of Means: {results.mse_of_means}")
     log.info(f"In QCE: {results.qce}")
-    WeatherResults(model, "in", results, after - before).store(out_path + f"results_in.pyc")
+    WeatherResults(model, "in", results, after - before, trained_model.all_losses()).store(out_path + f"results_in.pyc")
 
     # Eval out
     testloader = dataset.out_testloader(128)
@@ -100,7 +94,7 @@ def run(device, config, out_path, log):
     log.info(f"Out Mean MSE: {results.mean_mse}")
     log.info(f"Out MSE of Means: {results.mse_of_means}")
     log.info(f"Out QCE: {results.qce}")
-    WeatherResults(model, "out", results, after - before).store(out_path + f"results_out.pyc")
+    WeatherResults(model, "out", results, after - before, trained_model.all_losses()).store(out_path + f"results_out.pyc")
 
 
 def run_map(device, trainloader, init_std, es, config):
