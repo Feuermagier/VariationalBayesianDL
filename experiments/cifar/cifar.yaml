@@ -14,7 +14,7 @@ sbatch_args:
 ---
 name: "DEFAULT"
 path: "results"
-repetitions: 2
+repetitions: 5
 reps_per_job: 1
 reps_in_parallel: 1
 
