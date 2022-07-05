@@ -52,16 +52,19 @@ def run(device, config, out_path, log):
     testloader = cifar.cifar10_testloader(config["data_path"], config["batch_size"], exclude_classes=classes)
     acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, "normal", log)
     CIFARResults(model, "standard", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + "results_normal.pyc")
+    del testloader
 
     for i in config["intensities"]:
         testloader = cifar.cifar10_corrupted_testloader(config["data_path"], i, config["batch_size"])
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"C({i})", log)
         CIFARResults(model, f"C({i})", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_{i}.pyc")
+        del testloader
 
     if config["stl10"]:
         testloader = cifar.stl10_testloader(config["data_path"], config["batch_size"])
         acc, log_likelihood, likelihood, cal_res = exp.eval_model(trained_model, config["eval_samples"], testloader, device, f"STL10", log)
         CIFARResults(model, f"STL10", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_stl10.pyc")
+        del testloader
 
 def optimizer(config):
     return sgd(config["lr"], weight_decay=config["weight_decay"], momentum=config["momentum"], nesterov=config["nesterov"])

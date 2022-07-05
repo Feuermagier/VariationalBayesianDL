@@ -69,6 +69,7 @@ def plot_calibration(title, results, ax, include_text=True):
     ax.set_xticks(results.quantile_ps)
     ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.2f"))
     ax.set_ylim(0, 1)
+    ax.xaxis.grid(True, linestyle="-", alpha=0.4)
     if include_text:
         if title is not None:
             text = f"{title}\nQCE: {results.qce:.3f}"

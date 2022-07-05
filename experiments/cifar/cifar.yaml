@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 400
+time: 600
 sbatch_args:
   gres: "gpu:1"
 
@@ -32,18 +32,18 @@ params:
   nesterov: True
   stl10: True
 
----
-name: "MAP"
-params:
-  model: "map"
-  lr: 0.1
+# ---
+# name: "MAP"
+# params:
+#   model: "map"
+#   lr: 0.1
 
----
-name: "Ensemble-5"
-params:
-  model: "ensemble"
-  members: 5
-  lr: 0.1
+# ---
+# name: "Ensemble-5"
+# params:
+#   model: "ensemble"
+#   members: 5
+#   lr: 0.1
 
 ---
 name: "SWAG"
@@ -51,8 +51,8 @@ params:
   model: "swag"
   swag_config:
     deviation_samples: 30
-    mean_samples: 100
-    start_epoch: 161
+    mean_samples: 50
+    start_epoch: 250
     lr: 0.01
   lr: 0.1
 
@@ -63,23 +63,23 @@ params:
   members: 5
   swag_config:
     deviation_samples: 30
-    mean_samples: 100
-    start_epoch: 161
+    mean_samples: 50
+    start_epoch: 250
     lr: 0.01
   lr: 0.1
 
 
----
-name: "MCDropout"
-params:
-  model: "mcd"
-  p: 0.1
-  lr: 0.1
+# ---
+# name: "MCDropout"
+# params:
+#   model: "mcd"
+#   p: 0.1
+#   lr: 0.1
 
----
-name: "MultiMCDropout"
-params:
-  model: "multi_mcd"
-  members: 5
-  p: 0.1
-  lr: 0.1
+# ---
+# name: "MultiMCDropout"
+# params:
+#   model: "multi_mcd"
+#   members: 5
+#   p: 0.1
+#   lr: 0.1

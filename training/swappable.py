@@ -5,4 +5,4 @@ import torch.nn.functional as F
 
 class SwappableLinear(nn.Module):
     def __init__(self, in_features, out_features):
-        
+        self.weights = nn.Parameter(torch.)

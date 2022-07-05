@@ -56,7 +56,7 @@ def vogn_step(parameters, grads, states):
             sq_grad = (grad**2).mean(dim=0)
 
             if state["scale"] is None:
-                state["scale"] = sq_grad + delta + state["damping"] # We treat the first batch as our initialization batch
+                state["scale"] = sq_grad # We treat the first batch as our initialization batch
                 new_parameters.append(param)
             else:
                 state["momentum"] = beta1 * state["momentum"] + (1 - beta1) * (avg_grad + delta * param)

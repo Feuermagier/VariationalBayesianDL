@@ -57,7 +57,7 @@ class SwagModel(nn.Module):
         scheduler = scheduler_factory(optimizer) if scheduler_factory is not None else None
 
         if self.update_every_batches == -1:
-            self.update_every_batches = np.ceil(len(loader) * (epochs - self.start_epoch) / self.deviation_samples)
+            self.update_every_batches = np.ceil(len(loader) * (epochs - self.start_epoch) / self.mean_samples)
 
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)
@@ -70,7 +70,7 @@ class SwagModel(nn.Module):
                 optimizer.step()
                 epoch_loss += loss.cpu().item()
                 self.swag_update(epoch, batch_idx, optimizer)
-            epoch_loss /= (len(loader) * batch_size)
+            epoch_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
 
             if scheduler is not None:
@@ -135,7 +135,7 @@ class SwagModel(nn.Module):
                     g["lr"] = self.lr
 
     def report_status(self):
-        print(f"SWAG: Collected {np.minimum(self.updates, self.deviation_samples)} out of {self.deviation_samples} deviation samples and {self.updates} parameter samples")
+        print(f"SWAG: Collected {np.minimum(self.updates, self.deviation_samples)} out of {self.deviation_samples} deviation samples and {self.updates} out of {self.mean_samples} parameter samples")
 
 class SWAGWrapper:
     def __init__(self, model: nn.Module, optimizer, config, device, use_lr_cycles: bool = True):

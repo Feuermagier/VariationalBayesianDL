@@ -18,6 +18,6 @@ class CIFARResults:
         with open(filename, "wb+") as file:
             pickle.dump(self, file)
 
-    def load(filename):
+    def load(filename) -> 'CIFARResults':
         with open(filename, "rb") as file:
             return pickle.load(file)
