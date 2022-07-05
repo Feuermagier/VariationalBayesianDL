@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 600
+time: 400
 sbatch_args:
   gres: "gpu:1"
 
@@ -76,10 +76,10 @@ params:
 #   p: 0.1
 #   lr: 0.1
 
-# ---
-# name: "MultiMCDropout"
-# params:
-#   model: "multi_mcd"
-#   members: 5
-#   p: 0.1
-#   lr: 0.1
+---
+name: "MultiMCDropout"
+params:
+  model: "multi_mcd"
+  members: 5
+  p: 0.1
+  lr: 0.1
