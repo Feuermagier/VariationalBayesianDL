@@ -37,6 +37,10 @@ def run(device, config, out_path, log):
         trained_model = run_mcd(device, trainloader, config)
     elif model == "multi_mcd":
         trained_model = run_multi_mcd(device, trainloader, config)
+    elif model == "bbb":
+        trained_model = run_bbb(device, trainloader, config)
+    elif model == "multi_bbb":
+        trained_model = run_multi_bbb(device, trainloader, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     

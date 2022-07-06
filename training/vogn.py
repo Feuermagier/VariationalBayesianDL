@@ -22,7 +22,7 @@ def vogn_init(parameters, N, init):
         state["bias_correction"] = init["bias_correction"] if "bias_correction" in init else False
         state["sample"] = init["sample"] if "sample" in init else True # Set this to False to use OGN
 
-        state["N"] = N
+        state["N"] = N * state["augmentation"]
         state["momentum"] = torch.zeros_like(param, device=param.device)
         state["scale"] = None
         state["step"] = 0
@@ -30,11 +30,11 @@ def vogn_init(parameters, N, init):
         states.append(state)
     return states
 
-def vogn_prepare(parameters, states):
+def vogn_prepare(parameters, states, tempering_multiplier):
     perturbed_params = []
     for param, state in zip(parameters, states):
         if state["scale"] is not None and state["sample"] is True:
-            delta = state["augmentation"] * state["prior_prec"] / state["N"]
+            delta = state["tempering"] * tempering_multiplier * state["prior_prec"] / state["N"]
             std = (1 / (delta + state["scale"] + state["damping"]) / state["N"]).sqrt()
             epsilon = torch.randn_like(param, device=param.device)
             perturbed_params.append(param + epsilon * std)
@@ -42,14 +42,14 @@ def vogn_prepare(parameters, states):
             perturbed_params.append(param)
     return perturbed_params
 
-def vogn_step(parameters, grads, states):
+def vogn_step(parameters, grads, states, tempering_multiplier):
     new_parameters = []
     with torch.no_grad():
         for grad, param, state in zip(grads, parameters, states):
             state["step"] += 1
             t = state["step"]
             beta1, beta2 = state["betas"]
-            delta = state["augmentation"] * state["prior_prec"] / state["N"]
+            delta = state["tempering"] * tempering_multiplier * state["prior_prec"] / state["N"]
 
             grad = grad.mean(dim=0)
             avg_grad = grad.mean(dim=0)
@@ -60,7 +60,7 @@ def vogn_step(parameters, grads, states):
                 new_parameters.append(param)
             else:
                 state["momentum"] = beta1 * state["momentum"] + (1 - beta1) * (avg_grad + delta * param)
-                state["scale"] = (1 - state["tempering"] * beta2) * state["scale"] + beta2 * sq_grad
+                state["scale"] = (1 - state["tempering"] * tempering_multiplier * beta2) * state["scale"] + beta2 * sq_grad
                 update = state["lr"] * state["momentum"] / (state["scale"] + state["damping"] + delta)
                 if state["bias_correction"]:
                     update *= (1 - beta2**t) / (1 - beta1**t)
@@ -89,11 +89,14 @@ class VOGNModule(nn.Module):
         self.optim_state = dict["optim_state"]
         self.losses = dict["losses"]
 
-    def train_model(self, epochs, loss_fn, optim_params, loader, batch_size, device, report_every_epochs=1, mc_samples=10):
+    def train_model(self, epochs, loss_fn, optim_params, loader, batch_size, device, report_every_epochs=1, mc_samples=10, delay=None):
         self.params = [p.to(device) for p in self.params]
         self.buffs = [b.to(device) for b in self.buffs]
 
         self.optim_state = vogn_init(self.params, len(loader) * batch_size, optim_params)
+
+        if delay is None:
+            delay = 0
 
         def get_loss(parameters, input, target):
             input = input.unsqueeze(0)
@@ -102,19 +105,24 @@ class VOGNModule(nn.Module):
             loss = loss_fn(output, target)
             return loss
 
-        def run_sample(parameters, optim_state, input, target):
-            prep_params = vogn_prepare(parameters, optim_state)
+        def run_sample(parameters, optim_state, input, target, tempering):
+            prep_params = vogn_prepare(parameters, optim_state, tempering)
             return vmap(grad_and_value(get_loss), (None, 0, 0))(prep_params, input, target)
 
         for epoch in range(epochs):
             epoch_loss = torch.tensor(0, dtype=torch.float)
+            if epoch < delay:
+                tempering = epoch / delay * 0.9 + 0.1
+            else:
+                tempering = 1
+
             for data, target in loader:
                 data, target = data.to(device), target.to(device)
                 data, target = data.expand(mc_samples, *data.shape), target.expand(mc_samples, *target.shape)
 
-                grads, loss = vmap(run_sample, (None, None, 0, 0), randomness="different")(self.params, self.optim_state, data, target)
+                grads, loss = vmap(run_sample, (None, None, 0, 0, None), randomness="different")(self.params, self.optim_state, data, target, tempering)
                 loss = loss.mean()
-                self.params, self.optim_state = vogn_step(self.params, grads, self.optim_state)
+                self.params, self.optim_state = vogn_step(self.params, grads, self.optim_state, tempering)
                 
                 epoch_loss += loss.cpu().item()
             epoch_loss /= len(loader)
@@ -127,7 +135,7 @@ class VOGNModule(nn.Module):
 
     def infer(self, input, samples):
         def sample_single(model, params, buffers, input):
-            perturbed_params = vogn_prepare(params, self.optim_state)
+            perturbed_params = vogn_prepare(params, self.optim_state, 1)
             return model(perturbed_params, buffers, input)
         o = vmap(sample_single, in_dims=(None, None, None, 0), randomness="different")(self.model, self.params, self.buffs, input.expand(samples, *input.shape))
         return o.squeeze(1)

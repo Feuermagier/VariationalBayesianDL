@@ -45,29 +45,28 @@ params:
 #   members: 5
 #   lr: 0.1
 
----
-name: "SWAG"
-params:
-  model: "swag"
-  swag_config:
-    deviation_samples: 30
-    mean_samples: 50
-    start_epoch: 250
-    lr: 0.01
-  lr: 0.1
+# ---
+# name: "SWAG"
+# params:
+#   model: "swag"
+#   swag_config:
+#     deviation_samples: 30
+#     mean_samples: 50
+#     start_epoch: 250
+#     lr: 0.01
+#   lr: 0.1
 
----
-name: "MultiSWAG"
-params:
-  model: "multi_swag"
-  members: 5
-  swag_config:
-    deviation_samples: 30
-    mean_samples: 50
-    start_epoch: 250
-    lr: 0.01
-  lr: 0.1
-
+# ---
+# name: "MultiSWAG"
+# params:
+#   model: "multi_swag"
+#   members: 5
+#   swag_config:
+#     deviation_samples: 30
+#     mean_samples: 50
+#     start_epoch: 250
+#     lr: 0.01
+#   lr: 0.1
 
 # ---
 # name: "MCDropout"
@@ -76,10 +75,20 @@ params:
 #   p: 0.1
 #   lr: 0.1
 
+# ---
+# name: "MultiMCDropout"
+# params:
+#   model: "multi_mcd"
+#   members: 5
+#   p: 0.1
+#   lr: 0.1
+
 ---
-name: "MultiMCDropout"
+name: "BBB"
 params:
-  model: "multi_mcd"
-  members: 5
-  p: 0.1
-  lr: 0.1
+  model: "bbb"
+  prior_mean: 1
+  prior_std: 0
+  kl_rescaling: 0.2
+  mc_samples: 2
+  lr: 0.5
