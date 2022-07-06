@@ -87,8 +87,8 @@ params:
 name: "BBB"
 params:
   model: "bbb"
-  prior_mean: 1
-  prior_std: 0
+  prior_mean: 0
+  prior_std: 1
   kl_rescaling: 0.2
   mc_samples: 2
   lr: 0.5
