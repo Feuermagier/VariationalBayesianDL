@@ -43,6 +43,13 @@ class RegressionResults:
         self.quantile_ps = torch.linspace(0, 1, cal_steps)
         self.qce = (self.observed_cdf - self.quantile_ps).abs().mean()
 
+    def plot_reliability(self, ax, include_text=True):
+        plot_calibration(self.name, self, ax, include_text)
+
+    @property
+    def sqce(self):
+        return (self.observed_cdf - self.quantile_ps).mean()
+
 def calc_quantile_frequencies(means, stds, targets, quantile_steps):
     quantile_ps = torch.linspace(0, 1, 2 * quantile_steps - 1)
     samples = torch.distributions.Normal(means, stds).sample()

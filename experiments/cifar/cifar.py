@@ -10,11 +10,12 @@ from cw2.cw_data import cw_logging
 from experiments.base import cifar
 from experiments.cifar.results import CIFARResults
 import experiments.base.multiclass_classification as exp
-from training.util import sgd, lr_scheduler, wilson_scheduler
+from training.util import sgd, lr_scheduler, wilson_scheduler, scheduler_factory
 from training.pp import MAP
 from training.ensemble import Ensemble
 from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
+from training.vogn import iVONModuleFunctorch
 
 def run(device, config, out_path, log):
     class_exclusion = config["classes"]
@@ -41,6 +42,8 @@ def run(device, config, out_path, log):
         trained_model = run_bbb(device, trainloader, config)
     elif model == "multi_bbb":
         trained_model = run_multi_bbb(device, trainloader, config)
+    elif model == "ivon":
+        trained_model = run_ivon(device, trainloader, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -73,9 +76,11 @@ def run(device, config, out_path, log):
 def optimizer(config):
     return sgd(config["lr"], weight_decay=config["weight_decay"], momentum=config["momentum"], nesterov=config["nesterov"])
 
-def schedule(config):
-    # return lr_scheduler(config["lr_milestones"], config["lr_decay"])
+def stateless_schedule(config):
     return wilson_scheduler(config["epochs"], config["lr"], None)
+
+def stateful_schedule(config):
+    return scheduler_factory(stateless_schedule(config))
 
 def run_map(device, trainloader, config):
     layers = [
@@ -84,7 +89,7 @@ def run_map(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 def run_ensemble(device, trainloader, config):
@@ -95,7 +100,7 @@ def run_ensemble(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 def run_swag(device, trainloader, config):
@@ -107,7 +112,7 @@ def run_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    scheduler = wilson_scheduler(swag_config["start_epoch"], config["lr"], swag_config["lr"])
+    scheduler = scheduler_factory(wilson_scheduler(swag_config["start_epoch"], config["lr"], swag_config["lr"]))
     model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=scheduler, report_every_epochs=1)
     return model
 
@@ -121,7 +126,7 @@ def run_multi_swag(device, trainloader, config):
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    scheduler = wilson_scheduler(swag_config["start_epoch"], config["lr"], swag_config["lr"])
+    scheduler = scheduler_factory((swag_config["start_epoch"], config["lr"], swag_config["lr"]))
     model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=scheduler, report_every_epochs=1)
     return model
 
@@ -132,7 +137,7 @@ def run_mcd(device, trainloader, config):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 def run_multi_mcd(device, trainloader, config):
@@ -143,7 +148,7 @@ def run_multi_mcd(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 def run_bbb(device, trainloader, config):
@@ -154,7 +159,7 @@ def run_bbb(device, trainloader, config):
     ]
 
     model = BBBModel(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
 def run_multi_bbb(device, trainloader, config):
@@ -166,7 +171,17 @@ def run_multi_bbb(device, trainloader, config):
     ]
 
     model = Ensemble([BBBModel(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    return model
+
+def run_ivon(device, trainloader, config):
+    layers = [
+        ("preresnet-20", (32, 3, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = iVONModuleFunctorch(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, scheduler=stateless_schedule(config), mc_samples=config["mc_samples"])
     return model
 
 ####################### CW2 #####################################

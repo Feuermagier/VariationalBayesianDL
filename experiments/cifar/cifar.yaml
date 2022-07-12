@@ -83,12 +83,25 @@ params:
 #   p: 0.1
 #   lr: 0.1
 
+# ---
+# name: "BBB"
+# params:
+#   model: "bbb"
+#   prior_mean: 0
+#   prior_std: 1
+#   kl_rescaling: 0.2
+#   mc_samples: 2
+#   lr: 0.5
+
 ---
-name: "BBB"
+name: "iVON"
 params:
-  model: "bbb"
-  prior_mean: 0
-  prior_std: 1
-  kl_rescaling: 0.2
+  model: "ivon"
   mc_samples: 2
-  lr: 0.5
+  ivon:
+    lr: 0.1
+    prior_prec: 10
+    betas: (0.9, 0.999)
+    damping: 0.001
+    augmentation: 5
+    sample: True

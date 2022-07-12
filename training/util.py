@@ -25,6 +25,20 @@ def nll_loss(output, target, eps: float = 1e-6,):
     loss = 0.5 * (torch.log(var) + (mean - target)**2 / var)
     return loss.mean()
 
+def scheduler_factory(schedule):
+    return lambda opt: torch.optim.lr_scheduler.LambdaLR(opt, schedule)
+
+def step_scheduler(milestones, gamma):
+    def schedule(epoch):
+        lr = 1
+        for milestone in milestones:
+            if milestone <= epoch:
+                lr *= gamma
+            else:
+                break
+        return lr
+    return schedule
+
 def lr_scheduler(milestones, gamma):
     return lambda opt: torch.optim.lr_scheduler.MultiStepLR(opt, milestones, gamma)
 
@@ -39,7 +53,7 @@ def wilson_scheduler(pretrain_epochs, lr_init, swag_lr=None):
         else:
             factor = lr_ratio
         return factor
-    return lambda opt: torch.optim.lr_scheduler.LambdaLR(opt, wilson_schedule)
+    return wilson_schedule
 
 # Weighted sum of two gaussian distributions
 class GaussianMixture:

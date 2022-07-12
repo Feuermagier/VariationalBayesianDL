@@ -7,3 +7,4 @@
 - VOGN: Less MC samples sometimes better because noise explores parameter space better?
 - Flipout?
 - What do we want from a good posterior approximation?
+- Stein Variational Gradient Descent

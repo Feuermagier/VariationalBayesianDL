@@ -119,7 +119,6 @@ class VOGNModule(nn.Module):
             for data, target in loader:
                 data, target = data.to(device), target.to(device)
                 data, target = data.expand(mc_samples, *data.shape), target.expand(mc_samples, *target.shape)
-
                 grads, loss = vmap(run_sample, (None, None, 0, 0, None), randomness="different")(self.params, self.optim_state, data, target, tempering)
                 loss = loss.mean()
                 self.params, self.optim_state = vogn_step(self.params, grads, self.optim_state, tempering)
@@ -235,7 +234,7 @@ class iVONModuleFunctorch(nn.Module):
         self.optim_state = dict["optim_state"]
         self.losses = dict["losses"]
 
-    def train_model(self, epochs, loss_fn, optim_params, loader, batch_size, device, report_every_epochs=1, mc_samples=10):
+    def train_model(self, epochs, loss_fn, optim_params, loader, batch_size, device, scheduler=None, report_every_epochs=1, mc_samples=10):
         self.params = [p.to(device) for p in self.params]
         self.buffs = [b.to(device) for b in self.buffs]
 
@@ -262,8 +261,13 @@ class iVONModuleFunctorch(nn.Module):
                 loss = loss.mean()
                 self.params, self.optim_state = ivon_step(self.params, grads, self.optim_state, noise)
                 epoch_loss += loss.cpu().item()
-            epoch_loss /= (len(loader) * batch_size)
+            epoch_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
+
+            if scheduler is not None:
+                new_lr = scheduler(epoch)
+                for state in self.optim_state:
+                    state["lr"] *= new_lr
 
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")
