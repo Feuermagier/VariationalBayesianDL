@@ -89,7 +89,7 @@ class VOGNModule(nn.Module):
         self.optim_state = dict["optim_state"]
         self.losses = dict["losses"]
 
-    def train_model(self, epochs, loss_fn, optim_params, loader, batch_size, device, report_every_epochs=1, mc_samples=10, delay=None):
+    def train_model(self, epochs, loss_fn, optim_params, loader, batch_size, device, scheduler=None, report_every_epochs=1, mc_samples=10, delay=None):
         self.params = [p.to(device) for p in self.params]
         self.buffs = [b.to(device) for b in self.buffs]
 
@@ -126,6 +126,11 @@ class VOGNModule(nn.Module):
                 epoch_loss += loss.cpu().item()
             epoch_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
+
+            if scheduler is not None:
+                new_lr = scheduler(epoch)
+                for state in self.optim_state:
+                    state["lr"] *= new_lr
 
             if report_every_epochs > 0 and epoch % report_every_epochs == 0:
                 print(f"Epoch {epoch}: loss {epoch_loss}")

@@ -15,7 +15,7 @@ from training.pp import MAP
 from training.ensemble import Ensemble
 from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
-from training.vogn import iVONModuleFunctorch
+from training.vogn import VOGNModule, iVONModuleFunctorch
 
 def run(device, config, out_path, log):
     class_exclusion = config["classes"]
@@ -42,6 +42,8 @@ def run(device, config, out_path, log):
         trained_model = run_bbb(device, trainloader, config)
     elif model == "multi_bbb":
         trained_model = run_multi_bbb(device, trainloader, config)
+    elif model == "vogn":
+        trained_model = run_vogn(device, trainloader, config)
     elif model == "ivon":
         trained_model = run_ivon(device, trainloader, config)
     else:
@@ -73,8 +75,8 @@ def run(device, config, out_path, log):
         CIFARResults(model, f"STL10", acc, log_likelihood, likelihood, cal_res, after - before, trained_model.all_losses()).store(out_path + f"results_stl10.pyc")
         del testloader
 
-def optimizer(config):
-    return sgd(config["lr"], weight_decay=config["weight_decay"], momentum=config["momentum"], nesterov=config["nesterov"])
+def optimizer(config, reg=True):
+    return sgd(config["lr"], weight_decay=config["weight_decay"] if reg else 0, momentum=config["momentum"], nesterov=config["nesterov"])
 
 def stateless_schedule(config):
     return wilson_scheduler(config["epochs"], config["lr"], None)
@@ -159,7 +161,7 @@ def run_bbb(device, trainloader, config):
     ]
 
     model = BBBModel(layers)
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config, reg=False), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
 def run_multi_bbb(device, trainloader, config):
@@ -171,7 +173,17 @@ def run_multi_bbb(device, trainloader, config):
     ]
 
     model = Ensemble([BBBModel(layers) for _ in range(members)])
-    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config, reg=False), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    return model
+
+def run_vogn(device, trainloader, config):
+    layers = [
+        ("preresnet-20", (32, 3, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = VOGNModule(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, scheduler=stateless_schedule(config), mc_samples=config["mc_samples"])
     return model
 
 def run_ivon(device, trainloader, config):

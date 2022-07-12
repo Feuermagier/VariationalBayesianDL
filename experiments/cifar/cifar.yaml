@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 400
+time: 800
 sbatch_args:
   gres: "gpu:1"
 
@@ -96,7 +96,7 @@ params:
 ---
 name: "iVON"
 params:
-  model: "ivon"
+  model: "vogn"
   mc_samples: 2
   lr: 0.1 # The lr scheduler requires this...
   ivon:
@@ -105,3 +105,16 @@ params:
     damping: 0.001
     augmentation: 5
     sample: True
+
+# ---
+# name: "iVON"
+# params:
+#   model: "ivon"
+#   mc_samples: 2
+#   lr: 0.1 # The lr scheduler requires this...
+#   ivon:
+#     lr: 0.1
+#     prior_prec: 10
+#     damping: 0.001
+#     augmentation: 5
+#     sample: True
