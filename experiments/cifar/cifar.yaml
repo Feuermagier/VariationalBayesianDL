@@ -98,7 +98,7 @@ name: "iVON"
 params:
   model: "ivon"
   mc_samples: 2
-  ls: 0.1 # The lr scheduler requires this...
+  lr: 0.1 # The lr scheduler requires this...
   ivon:
     lr: 0.1
     prior_prec: 10
