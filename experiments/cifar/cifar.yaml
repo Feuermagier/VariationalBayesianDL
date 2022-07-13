@@ -83,28 +83,28 @@ params:
 #   p: 0.1
 #   lr: 0.1
 
-# ---
-# name: "BBB"
-# params:
-#   model: "bbb"
-#   prior_mean: 0
-#   prior_std: 1
-#   kl_rescaling: 0.2
-#   mc_samples: 2
-#   lr: 0.5
-
 ---
-name: "VOGN"
+name: "BBB"
 params:
-  model: "vogn"
+  model: "bbb"
+  prior_mean: 0
+  prior_std: 1
+  kl_rescaling: 0.2
   mc_samples: 2
-  lr: 0.1 # The lr scheduler requires this...
-  ivon:
-    lr: 0.1
-    prior_prec: 10
-    damping: 0.001
-    augmentation: 5
-    sample: True
+  lr: 0.5
+
+# ---
+# name: "VOGN"
+# params:
+#   model: "vogn"
+#   mc_samples: 2
+#   lr: 0.1 # The lr scheduler requires this...
+#   ivon:
+#     lr: 0.1
+#     prior_prec: 10
+#     damping: 0.001
+#     augmentation: 5
+#     sample: True
 
 # ---
 # name: "iVON"
