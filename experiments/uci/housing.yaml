@@ -23,8 +23,7 @@ params:
   test_percentage: 0.2
   eval_samples: 1000
   init_std: 0.1
-list:
-  dataset: ["housing", "concrete", "energy", "power", "wine", "yacht"]
+  dataset: "housing"
 
 ---
 name: "MAP"
@@ -46,8 +45,9 @@ name: "SWAG"
 params:
   model: "swag"
   swag_config:
+    mean_samples: 100
     deviation_samples: 30
-    start_epoch: 20
+    start_epoch: 800
   lr: 0.001
   epochs: 1000
 
@@ -114,6 +114,6 @@ params:
     prior_prec: 10
     damping: 0
     sample: True
-  lr: 0.01
+  lr: 0.001
   mc_samples: 2
-  epochs: 30
+  epochs: 1000
