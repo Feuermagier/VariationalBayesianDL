@@ -22,7 +22,7 @@ params:
   gap: True
   test_percentage: 0.2
   eval_samples: 1000
-  init_std: 0.1
+  init_std: 0.25
   dataset: "housing"
 
 ---
@@ -31,12 +31,25 @@ params:
   model: "map"
   lr: 0.001
   epochs: 1000
+  weight_decay: 0.0001
 
 ---
 name: "Ensemble-5"
 params:
   model: "ensemble"
   members: 5
+  lr: 0.001
+  epochs: 1000
+  weight_decay: 0.0001
+
+---
+name: "RMS"
+params:
+  model: "rms"
+  members: 5
+  gamma: 1
+  noise: 0.25
+  reg_scale: 0.5
   lr: 0.001
   epochs: 1000
 
@@ -50,6 +63,7 @@ params:
     start_epoch: 800
   lr: 0.001
   epochs: 1000
+  weight_decay: 0.0001
 
 ---
 name: "MultiSWAG"
@@ -57,27 +71,63 @@ params:
   model: "multi_swag"
   members: 5
   swag_config:
+    mean_samples: 100
     deviation_samples: 30
-    start_epoch: 20
+    start_epoch: 800
   lr: 0.001
   epochs: 1000
+  weight_decay: 0.0001
 
 ---
 name: "MCDropout"
 params:
   model: "mc_dropout"
-  p: 0.1
+  p: 0.2
   lr: 0.001
   epochs: 1000
+  weight_decay: 0.0001
 
 ---
 name: "MultiMCDropout"
 params:
   model: "multi_mc_dropout"
   members: 5
-  p: 0.1
+  p: 0.2
   lr: 0.001
   epochs: 1000
+  weight_decay: 0.0001
+
+---
+name: "BBB"
+params:
+  model: "bbb"
+  prior_std: 1
+  lr: 0.001
+  mc_samples: 2
+  epochs: 1000
+  kl_rescaling: 1
+
+---
+name: "MultiBBB"
+params:
+  model: "multi_bbb"
+  members: 5
+  prior_std: 1
+  lr: 0.001
+  mc_samples: 2
+  epochs: 1000
+  kl_rescaling: 1
+
+---
+name: "LRVI"
+params:
+  model: "lvri"
+  prior_std: 1
+  lr: 0.001
+  mc_samples: 2
+  k: 5
+  epochs: 1000
+  kl_rescaling: 1
 
 ---
 name: "VOGN"
@@ -103,13 +153,26 @@ params:
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 1000
+  epochs: 500
 
 ---
-name: "VOGN"
+name: "iVON"
 params:
-  model: "vogn"
-  vogn:
+  model: "ivon"
+  ivon:
+    lr: 0.001
+    prior_prec: 10
+    damping: 0
+    sample: True
+  lr: 0.001
+  mc_samples: 2
+  epochs: 500
+
+---
+name: "MultiIVON"
+params:
+  model: "multi_ivon"
+  ivon:
     lr: 0.001
     prior_prec: 10
     damping: 0
@@ -117,3 +180,14 @@ params:
   lr: 0.001
   mc_samples: 2
   epochs: 1000
+
+---
+name: "SGLD"
+params:
+  model: "sgld"
+  lr: 0.00001
+  burnin: 1000
+  interval: 5
+  epochs: 6000
+  chains: 1
+  temperature: 0.5

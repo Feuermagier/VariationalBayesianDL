@@ -18,6 +18,8 @@ from training.ensemble import Ensemble
 from training.pp import MAP
 from training.regresssion import RegressionResults, plot_calibration
 from training.sgld import SGLDModule, sgld
+from training.rms import RMSModule
+from training.vogn import VOGNModule, iVONModuleFunctorch
 
 
 def run(device, config, out_path, log):
@@ -34,39 +36,50 @@ def run(device, config, out_path, log):
 
     for i, (trainloader, testloader) in enumerate(loaders):
 
-        init_std = torch.tensor(config["init_std"]).to(device)
+        init_std = torch.tensor(config["init_std"]).to(device).repeat(dataset.out_dim)
         model = config["model"]
 
         before = time.time()
         if model == "map":
             trained_model = run_map(device, trainloader,
-                                    dataset.in_dim, init_std, config, out_path)
+                                    dataset.in_dim, init_std, config)
         elif model == "ensemble":
             trained_model = run_ensemble(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_std, config)
+        elif model == "rms":
+            trained_model = run_rms(
+                device, trainloader, dataset.in_dim, init_std, config)
         elif model == "swag":
             trained_model = run_swag(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_std, config)
         elif model == "multi_swag":
             trained_model = run_multi_swag(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_std, config)
         elif model == "mc_dropout":
             trained_model = run_mc_dropout(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_std, config)
         elif model == "multi_mc_dropout":
             trained_model = run_multi_mc_dropout(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
-        elif model == "mfvi":
-            trained_model = run_mfvi(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
-        elif model == "multi-mfvi":
-            trained_model = run_multi_mfvi(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_std, config)
+        elif model == "bbb":
+            trained_model = run_bbb(
+                device, trainloader, dataset.in_dim, init_std, config)
+        elif model == "multi_bbb":
+            trained_model = run_multi_bbb(
+                device, trainloader, dataset.in_dim, init_std, config)
         elif model == "lrvi":
             trained_model = run_lrvi(
-                device, trainloader, dataset.in_dim, init_std, config, out_path)
+                device, trainloader, dataset.in_dim, init_std, config)
         elif model == "sgld":
-            trained_model = run_sgld(device, trainloader, dataset.in_dim, init_std, config, out_path)
+            trained_model = run_sgld(device, trainloader, dataset.in_dim, init_std, config)
+        elif model == "vogn":
+            trained_model = run_vogn(device, trainloader, dataset.in_dim, init_std, config)
+        elif model == "multi_vogn":
+            trained_model = run_multi_vogn(device, trainloader, dataset.in_dim, init_std, config)
+        elif model == "ivon":
+            trained_model = run_ivon(device, trainloader, dataset.in_dim, init_std, config)
+        elif model == "multi_ivon":
+            trained_model = run_multi_ivon(device, trainloader, dataset.in_dim, init_std, config)
         else:
             raise ValueError(f"Unknown model type '{model}'")
 
@@ -97,7 +110,7 @@ def run(device, config, out_path, log):
         fig.savefig(out_path + f"reliability_{i}.pdf")
 
 
-def run_map(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_map(device, trainloader, in_dim, init_std, config):
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
@@ -106,12 +119,11 @@ def run_map(device, trainloader, in_dim, init_std, config, model_out_path):
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"], config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 
-def run_ensemble(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_ensemble(device, trainloader, in_dim, init_std, config):
     members = config["members"]
     layers = [
         ("fc", (in_dim, 50)),
@@ -121,12 +133,23 @@ def run_ensemble(device, trainloader, in_dim, init_std, config, model_out_path):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"], config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
+def run_rms(device, trainloader, in_dim, init_std, config):
+    members = config["members"]
+    layers = [
+        ("fc", (in_dim, 50)),
+        ("relu", ()),
+        ("fc", (50, 1)),
+        ("gauss", (init_std, True))
+    ]
 
-def run_swag(device, trainloader, in_dim, init_std, config, model_out_path):
+    model = Ensemble([RMSModule(layers, config["gamma"], config["noise"], config["reg_scale"]) for _ in range(members)])
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    return model
+
+def run_swag(device, trainloader, in_dim, init_std, config):
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
@@ -137,12 +160,11 @@ def run_swag(device, trainloader, in_dim, init_std, config, model_out_path):
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"], config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 
-def run_multi_swag(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_multi_swag(device, trainloader, in_dim, init_std, config):
     members = config["members"]
     layers = [
         ("fc", (in_dim, 50)),
@@ -154,12 +176,11 @@ def run_multi_swag(device, trainloader, in_dim, init_std, config, model_out_path
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"], config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 
-def run_mc_dropout(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_mc_dropout(device, trainloader, in_dim, init_std, config):
     p = config["p"]
     layers = [
         ("fc", (in_dim, 50)),
@@ -170,12 +191,11 @@ def run_mc_dropout(device, trainloader, in_dim, init_std, config, model_out_path
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"], config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 
-def run_multi_mc_dropout(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_multi_mc_dropout(device, trainloader, in_dim, init_std, config):
     members = config["members"]
     p = config["p"]
     layers = [
@@ -187,12 +207,11 @@ def run_multi_mc_dropout(device, trainloader, in_dim, init_std, config, model_ou
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, adam(config["lr"], config["weight_decay"]), trainloader, config["batch_size"], device, report_every_epochs=1)
     return model
 
 
-def run_mfvi(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_bbb(device, trainloader, in_dim, init_std, config):
     prior = GaussianPrior(0, 1)
     layers = [
         ("v_fc", (in_dim, 50, prior, {"rho_init": -3})),
@@ -206,7 +225,7 @@ def run_mfvi(device, trainloader, in_dim, init_std, config, model_out_path):
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_lrvi(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_lrvi(device, trainloader, in_dim, init_std, config):
     k = config["k"]
     layers = [
         ("vlr_fc", (in_dim, 50, k, 1, {"rho_init": -3})),
@@ -220,7 +239,7 @@ def run_lrvi(device, trainloader, in_dim, init_std, config, model_out_path):
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_multi_mfvi(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_multi_bbb(device, trainloader, in_dim, init_std, config, model_out_path):
     members = config["members"]
     prior = GaussianPrior(0, 1)
     layers = [
@@ -243,9 +262,59 @@ def run_sgld(device, trainloader, in_dim, init_std, config, model_out_path):
         ("gauss", (init_std, True))
     ]
 
-    model = SGLDModule(layers, config["burnin"], config["interval"])
-    model.train_model(config["epochs"], nll_loss, sgld(config["lr"]), trainloader, config["batch_size"],
+    model = SGLDModule(layers, config["burnin"], config["interval"], config["chains"])
+    model.train_model(config["epochs"], nll_loss, sgld(config["lr"], config["temperature"]), trainloader, config["batch_size"],
                       device, report_every_epochs=1)
+    return model
+
+def run_vogn(device, trainloader, in_dim, init_std, config):
+    layers = [
+        ("fc", (in_dim, 50)),
+        ("relu", ()),
+        ("fc", (50, 1)),
+        ("gauss", (init_std, True))
+    ]
+
+    model = VOGNModule(layers)
+    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    return model
+
+def run_multi_vogn(device, trainloader, in_dim, init_std, config):
+    members = config["members"]
+    layers = [
+        ("fc", (in_dim, 50)),
+        ("relu", ()),
+        ("fc", (50, 1)),
+        ("gauss", (init_std, True))
+    ]
+
+    model = Ensemble([VOGNModule(layers) for _ in range(members)])
+    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    return model
+
+def run_ivon(device, trainloader, in_dim, init_std, config):
+    layers = [
+        ("fc", (in_dim, 50)),
+        ("relu", ()),
+        ("fc", (50, 1)),
+        ("gauss", (init_std, True))
+    ]
+
+    model = iVONModuleFunctorch(layers)
+    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    return model
+
+def run_multi_ivon(device, trainloader, in_dim, init_std, config):
+    members = config["members"]
+    layers = [
+        ("fc", (in_dim, 50)),
+        ("relu", ()),
+        ("fc", (50, 1)),
+        ("gauss", (init_std, True))
+    ]
+
+    model = Ensemble([iVONModuleFunctorch(layers) for _ in range(members)])
+    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################
