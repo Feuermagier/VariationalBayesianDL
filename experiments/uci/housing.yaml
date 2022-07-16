@@ -121,7 +121,7 @@ params:
 ---
 name: "LRVI"
 params:
-  model: "lvri"
+  model: "lrvi"
   prior_std: 1
   lr: 0.001
   mc_samples: 2
@@ -146,6 +146,7 @@ params:
 name: "MultiVOGN"
 params:
   model: "multi_vogn"
+  members: 5
   vogn:
     lr: 0.001
     prior_prec: 10
@@ -172,6 +173,7 @@ params:
 name: "MultiIVON"
 params:
   model: "multi_ivon"
+  members: 5
   ivon:
     lr: 0.001
     prior_prec: 10

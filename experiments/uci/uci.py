@@ -289,7 +289,7 @@ def run_ivon(device, trainloader, in_dim, init_std, config):
     ]
 
     model = iVONModuleFunctorch(layers)
-    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, config["ivon"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
 def run_multi_ivon(device, trainloader, in_dim, init_std, config):
@@ -302,7 +302,7 @@ def run_multi_ivon(device, trainloader, in_dim, init_std, config):
     ]
 
     model = Ensemble([iVONModuleFunctorch(layers) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, config["ivon"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################
