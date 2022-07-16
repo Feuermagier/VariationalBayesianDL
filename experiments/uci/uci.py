@@ -27,12 +27,12 @@ def run(device, config, out_path, log):
     dataset = UCIDatasets(config["dataset"], config["data_path"],
                           test_percentage=config["test_percentage"], normalize=True, subsample=1)
 
-    if config["gap"] is True:
-        loaders = [(torch.utils.data.DataLoader(split[0], config["batch_size"], shuffle=False),
-            torch.utils.data.DataLoader(split[1], config["batch_size"], shuffle=False)) for split in dataset.gap_splits]
-    else:
-        loaders = [(torch.utils.data.DataLoader(dataset.train_set, config["batch_size"], shuffle=False),
+    loaders = [(torch.utils.data.DataLoader(dataset.train_set, config["batch_size"], shuffle=False),
             torch.utils.data.DataLoader(dataset.test_set, config["batch_size"], shuffle=False))]
+
+    if config["gap"] is True:
+        loaders += [(torch.utils.data.DataLoader(split[0], config["batch_size"], shuffle=False),
+            torch.utils.data.DataLoader(split[1], config["batch_size"], shuffle=False)) for split in dataset.gap_splits]
 
     for i, (trainloader, testloader) in enumerate(loaders):
 
@@ -86,7 +86,7 @@ def run(device, config, out_path, log):
         after = time.time()
         log.info(f"Time: {after - before}s")
 
-        torch.save(trained_model.state_dict(), out_path + f"model_{i}.tar")
+        #torch.save(trained_model.state_dict(), out_path + f"model_{i}.tar")
 
         results = RegressionResults(testloader, model, trained_model.infer,
                                     config["eval_samples"], device, target_mean=dataset.target_mean, target_std=dataset.target_std)
