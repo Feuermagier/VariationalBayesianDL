@@ -16,6 +16,7 @@ from training.ensemble import Ensemble
 from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
 from training.vogn import VOGNModule, iVONModuleFunctorch
+from training.rms import RMSModule
 
 def run(device, config, out_path, log):
     class_exclusion = config["classes"]
@@ -30,6 +31,8 @@ def run(device, config, out_path, log):
         trained_model = run_map(device, trainloader, config)
     elif model == "ensemble":
         trained_model = run_ensemble(device, trainloader, config)
+    elif model == "rms":
+        trained_model = run_rms(device, trainloader, config)
     elif model == "swag":
         trained_model = run_swag(device, trainloader, config)
     elif model == "multi_swag":
@@ -44,8 +47,12 @@ def run(device, config, out_path, log):
         trained_model = run_multi_bbb(device, trainloader, config)
     elif model == "vogn":
         trained_model = run_vogn(device, trainloader, config)
+    elif model == "multi_vogn":
+        trained_model = run_multi_vogn(device, trainloader, config)
     elif model == "ivon":
         trained_model = run_ivon(device, trainloader, config)
+    elif model == "multi_ivon":
+        trained_model = run_multi_ivon(device, trainloader, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -102,6 +109,17 @@ def run_ensemble(device, trainloader, config):
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
+    return model
+
+def run_rms(device, trainloader, config):
+    members = config["members"]
+    layers = [
+        ("preresnet-20", (32, 3, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([RMSModule(layers, config["gamma"], config["noise"], config["reg_scale"]) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
@@ -186,6 +204,17 @@ def run_vogn(device, trainloader, config):
     model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, scheduler=stateless_schedule(config), mc_samples=config["mc_samples"])
     return model
 
+def run_multi_vogn(device, trainloader, config):
+    members = config["members"]
+    layers = [
+        ("preresnet-20", (32, 3, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([VOGNModule(layers) for _ in range(members)])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, scheduler=stateless_schedule(config), mc_samples=config["mc_samples"])
+    return model
+
 def run_ivon(device, trainloader, config):
     layers = [
         ("preresnet-20", (32, 3, 10)),
@@ -193,6 +222,17 @@ def run_ivon(device, trainloader, config):
     ]
 
     model = iVONModuleFunctorch(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, scheduler=stateless_schedule(config), mc_samples=config["mc_samples"])
+    return model
+
+def run_multi_ivon(device, trainloader, config):
+    members = config["members"]
+    layers = [
+        ("preresnet-20", (32, 3, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([iVONModuleFunctorch(layers) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, scheduler=stateless_schedule(config), mc_samples=config["mc_samples"])
     return model
 

@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
 mem-per-cpu: 1000
-time: 300
+time: 600
 
 ---
 name: "DEFAULT"
@@ -23,14 +23,14 @@ params:
   test_percentage: 0.2
   eval_samples: 1000
   init_std: 0.25
-  dataset: "energy"
+  dataset: "power"
 
 ---
 name: "MAP"
 params:
   model: "map"
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -39,7 +39,7 @@ params:
   model: "ensemble"
   members: 5
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -51,18 +51,18 @@ params:
   noise: 0.25
   reg_scale: 0.5
   lr: 0.001
-  epochs: 1000
+  epochs: 200
 
 ---
 name: "SWAG"
 params:
   model: "swag"
   swag_config:
-    mean_samples: 100
+    mean_samples: 50
     deviation_samples: 30
-    start_epoch: 800
+    start_epoch: 150
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -71,20 +71,20 @@ params:
   model: "multi_swag"
   members: 5
   swag_config:
-    mean_samples: 100
+    mean_samples: 50
     deviation_samples: 30
-    start_epoch: 800
+    start_epoch: 150
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
 name: "MCDropout"
 params:
   model: "mc_dropout"
-  p: 0.2
+  p: 0.1
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -92,9 +92,9 @@ name: "MultiMCDropout"
 params:
   model: "multi_mc_dropout"
   members: 5
-  p: 0.2
+  p: 0.1
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -121,12 +121,12 @@ params:
 ---
 name: "LRVI"
 params:
-  model: "lrvi"
+  model: "lvri"
   prior_std: 1
   lr: 0.001
   mc_samples: 2
   k: 5
-  epochs: 1000
+  epochs: 500
   kl_rescaling: 1
 
 ---
@@ -140,13 +140,12 @@ params:
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "MultiVOGN"
 params:
   model: "multi_vogn"
-  members: 5
   vogn:
     lr: 0.001
     prior_prec: 10
@@ -154,7 +153,7 @@ params:
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "iVON"
@@ -167,13 +166,12 @@ params:
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "MultiIVON"
 params:
   model: "multi_ivon"
-  members: 5
   ivon:
     lr: 0.001
     prior_prec: 10
@@ -181,7 +179,7 @@ params:
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "SGLD"

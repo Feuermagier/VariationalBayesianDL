@@ -67,7 +67,7 @@ def reliability_diagram(bin_count, errors, confidences, ax, include_accuracy=Tru
 def _create_static_bins(bin_count, confidences):
     bins = [[] for _ in range(bin_count)]
     for i, confidence in enumerate(confidences):
-        bin = torch.floor(confidence * bin_count).int()
+        bin = torch.clamp(torch.floor(confidence * bin_count), min=0).int()
         bins[bin if bin != bin_count else bin_count - 1].append(i)
     return bins
 
