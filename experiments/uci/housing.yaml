@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
 mem-per-cpu: 1000
-time: 90
+time: 300
 
 ---
 name: "DEFAULT"

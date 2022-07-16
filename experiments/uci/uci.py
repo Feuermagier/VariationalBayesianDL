@@ -90,24 +90,12 @@ def run(device, config, out_path, log):
 
         results = RegressionResults(testloader, model, trained_model.infer,
                                     config["eval_samples"], device, target_mean=dataset.target_mean, target_std=dataset.target_std)
-        log.info(f"Avg LML: {results.average_lml}")
-        log.info(f"Mean MSE: {results.mean_mse}")
-        log.info(f"MSE of Means: {results.mse_of_means}")
-        log.info(f"QCE: {results.qce}")
+        log.info(f"{i}: Avg LML: {results.average_lml}")
+        log.info(f"{i}: Mean MSE: {results.mean_mse}")
+        log.info(f"{i}: MSE of Means: {results.mse_of_means}")
+        log.info(f"{i}: QCE: {results.qce}")
 
-        UCIResults(model, config["dataset"], results, after - before).store(out_path + f"results_{i}.pyc")
-
-        # Plot loss
-        fig, ax = plt.subplots()
-        plot_losses(model, trained_model.all_losses(), ax)
-        fig.set_tight_layout(True)
-        fig.savefig(out_path + f"loss_{i}.pdf")
-
-        # Plot calibration
-        fig, ax = plt.subplots()
-        plot_calibration(None, results, ax, include_text=True)
-        fig.set_tight_layout(True)
-        fig.savefig(out_path + f"reliability_{i}.pdf")
+        UCIResults(model, config["dataset"], trained_model.all_losses(), results, after - before).store(out_path + f"results_{i}.pyc")
 
 
 def run_map(device, trainloader, in_dim, init_std, config):
