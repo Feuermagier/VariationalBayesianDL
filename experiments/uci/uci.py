@@ -239,7 +239,7 @@ def run_lrvi(device, trainloader, in_dim, init_std, config):
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_multi_bbb(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_multi_bbb(device, trainloader, in_dim, init_std, config):
     members = config["members"]
     prior = GaussianPrior(0, 1)
     layers = [
@@ -254,7 +254,7 @@ def run_multi_bbb(device, trainloader, in_dim, init_std, config, model_out_path)
                       device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
-def run_sgld(device, trainloader, in_dim, init_std, config, model_out_path):
+def run_sgld(device, trainloader, in_dim, init_std, config):
     layers = [
         ("fc", (in_dim, 50)),
         ("relu", ()),
