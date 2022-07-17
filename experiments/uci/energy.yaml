@@ -21,7 +21,7 @@ params:
   data_path: "../../data/"
   gap: True
   test_percentage: 0.2
-  eval_samples: 1000
+  eval_samples: 200
   init_std: 0.25
   dataset: "energy"
 
@@ -30,7 +30,7 @@ name: "MAP"
 params:
   model: "map"
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -39,7 +39,7 @@ params:
   model: "ensemble"
   members: 5
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -51,18 +51,18 @@ params:
   noise: 0.25
   reg_scale: 0.5
   lr: 0.001
-  epochs: 1000
+  epochs: 200
 
 ---
 name: "SWAG"
 params:
   model: "swag"
   swag_config:
-    mean_samples: 100
+    mean_samples: 50
     deviation_samples: 30
-    start_epoch: 800
+    start_epoch: 150
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -71,11 +71,11 @@ params:
   model: "multi_swag"
   members: 5
   swag_config:
-    mean_samples: 100
+    mean_samples: 50
     deviation_samples: 30
-    start_epoch: 800
+    start_epoch: 150
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -84,7 +84,7 @@ params:
   model: "mc_dropout"
   p: 0.2
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -94,7 +94,7 @@ params:
   members: 5
   p: 0.2
   lr: 0.001
-  epochs: 1000
+  epochs: 200
   weight_decay: 0.0001
 
 ---
@@ -104,7 +104,7 @@ params:
   prior_std: 1
   lr: 0.001
   mc_samples: 2
-  epochs: 1000
+  epochs: 500
   kl_rescaling: 1
 
 ---
@@ -115,7 +115,7 @@ params:
   prior_std: 1
   lr: 0.001
   mc_samples: 2
-  epochs: 1000
+  epochs: 500
   kl_rescaling: 1
 
 ---
@@ -126,7 +126,7 @@ params:
   lr: 0.001
   mc_samples: 2
   k: 5
-  epochs: 1000
+  epochs: 500
   kl_rescaling: 1
 
 ---
@@ -136,11 +136,11 @@ params:
   vogn:
     lr: 0.001
     prior_prec: 10
-    damping: 0
+    damping: 0.0001
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "MultiVOGN"
@@ -150,11 +150,11 @@ params:
   vogn:
     lr: 0.001
     prior_prec: 10
-    damping: 0
+    damping: 0.0001
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "iVON"
@@ -167,7 +167,7 @@ params:
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "MultiIVON"
@@ -181,7 +181,7 @@ params:
     sample: True
   lr: 0.001
   mc_samples: 2
-  epochs: 500
+  epochs: 200
 
 ---
 name: "SGLD"
