@@ -234,6 +234,7 @@ class iVONModuleFunctorch(nn.Module):
         self.model, self.params, self.buffs = make_functional_with_buffers(generate_model(layers))
         self.optim_state = None
         self.losses = []
+        self.mle_params = [i for i in range(len(self.params)) if self.model.param_names[i].endswith("rho")]
 
     def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
@@ -253,7 +254,7 @@ class iVONModuleFunctorch(nn.Module):
         self.params = [p.to(device) for p in self.params]
         self.buffs = [b.to(device) for b in self.buffs]
 
-        self.optim_state = ivon_init(self.params, len(loader) * batch_size, optim_params)
+        self.optim_state = ivon_init(self.params, len(loader) * batch_size, optim_params, self.mle_params)
 
         def get_loss(parameters, input, target):
             #input = input.unsqueeze(0)
