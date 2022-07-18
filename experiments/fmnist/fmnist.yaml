@@ -26,68 +26,93 @@ params:
   classes: []
   weight_decay: 0.0001
 
----
-name: "MAP"
-params:
-  model: "map"
-  lr: 0.1
-  epochs: 30
+# ---
+# name: "MAP"
+# params:
+#   model: "map"
+#   lr: 0.1
+#   epochs: 30
+
+# ---
+# name: "Ensemble-5"
+# params:
+#   model: "ensemble"
+#   members: 5
+#   lr: 0.1
+#   epochs: 30
+
+# ---
+# name: "SWAG"
+# params:
+#   model: "swag"
+#   swag_config:
+#     mean_samples: 30
+#     deviation_samples: 30
+#     start_epoch: 25
+#   lr: 0.1
+#   epochs: 30
+
+# ---
+# name: "MultiSWAG"
+# params:
+#   model: "multi_swag"
+#   members: 5
+#   swag_config:
+#     mean_samples: 30
+#     deviation_samples: 30
+#     start_epoch: 25
+#   lr: 0.1
+#   epochs: 30
+
+# ---
+# name: "MCDropout"
+# params:
+#   model: "mc_dropout"
+#   p: 0.2
+#   lr: 0.1
+#   epochs: 40
+#   mc_samples: 1
+
+# ---
+# name: "MultiMCDropout"
+# params:
+#   model: "multi_mc_dropout"
+#   members: 5
+#   p: 0.2
+#   lr: 0.1
+#   epochs: 40
+#   mc_samples: 1
+
+# ---
+# name: "VOGN"
+# params:
+#   model: "vogn"
+#   vogn:
+#     lr: 0.01
+#     prior_prec: 50
+#     damping: 0.0001
+#     sample: True
+#   mc_samples: 5
+#   epochs: 30
+
+# ---
+# name: "MultiVOGN"
+# params:
+#   model: "multi_vogn"
+#   members: 5
+#   vogn:
+#     lr: 0.01
+#     prior_prec: 50
+#     damping: 0.0001
+#     sample: True
+#   mc_samples: 5
+#   epochs: 30
 
 ---
-name: "Ensemble-5"
+name: "iVON"
 params:
-  model: "ensemble"
-  members: 5
-  lr: 0.1
-  epochs: 30
-
----
-name: "SWAG"
-params:
-  model: "swag"
-  swag_config:
-    mean_samples: 30
-    deviation_samples: 30
-    start_epoch: 25
-  lr: 0.1
-  epochs: 30
-
----
-name: "MultiSWAG"
-params:
-  model: "multi_swag"
-  members: 5
-  swag_config:
-    mean_samples: 30
-    deviation_samples: 30
-    start_epoch: 25
-  lr: 0.1
-  epochs: 30
-
----
-name: "MCDropout"
-params:
-  model: "mc_dropout"
-  p: 0.2
-  lr: 0.1
-  epochs: 40
-  mc_samples: 1
-
----
-name: "MultiMCDropout"
-params:
-  model: "multi_mc_dropout"
-  members: 5
-  p: 0.2
-  lr: 0.1
-  epochs: 40
-  mc_samples: 1
-
----
-name: "VOGN"
-params:
-  model: "vogn"
-  vogn:
+  model: "ivon"
+  ivon:
     lr: 0.01
     prior_prec: 50
     damping: 0.0001
@@ -96,11 +121,11 @@ params:
   epochs: 30
 
 ---
-name: "MultiVOGN"
+name: "MultiIVON"
 params:
   model: "multi_vogn"
   members: 5
-  vogn:
+  ivon:
     lr: 0.01
     prior_prec: 50
     damping: 0.0001
@@ -108,21 +133,21 @@ params:
   mc_samples: 5
   epochs: 30
 
----
-name: "MFVI"
-params:
-  model: "mfvi"
-  lr: 0.01
-  epochs: 60
-  mc_samples: 2
-  kl_rescaling: 0.1
+# ---
+# name: "MFVI"
+# params:
+#   model: "mfvi"
+#   lr: 0.01
+#   epochs: 60
+#   mc_samples: 2
+#   kl_rescaling: 0.1
 
----
-name: "MultiMFVI-5"
-params:
-  model: "multi_mfvi"
-  members: 5
-  lr: 0.01
-  epochs: 60
-  mc_samples: 2
-  kl_rescaling: 0.1
+# ---
+# name: "MultiMFVI-5"
+# params:
+#   model: "multi_mfvi"
+#   members: 5
+#   lr: 0.01
+#   epochs: 60
+#   mc_samples: 2
+#   kl_rescaling: 0.1

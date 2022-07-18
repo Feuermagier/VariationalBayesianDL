@@ -15,7 +15,7 @@ from training.pp import MAP
 from training.ensemble import Ensemble
 from training.bbb import BBBModel, GaussianPrior
 from training.swag import SwagModel
-from training.vogn import VOGNModule
+from training.vogn import VOGNModule, iVONModuleFunctorch
 
 def run(device, config, out_path, log):
     class_exclusion = config["classes"]
@@ -46,6 +46,10 @@ def run(device, config, out_path, log):
         trained_model = run_vogn(device, trainloader, config)
     elif model == "multi_vogn":
         trained_model = run_multi_vogn(device, trainloader, config)
+    elif model == "ivon":
+        trained_model = run_ivon(device, trainloader, config)
+    elif model == "multi_ivon":
+        trained_model = run_multi_ivon(device, trainloader, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
     
@@ -295,6 +299,49 @@ def run_multi_vogn(device, trainloader, config):
 
     model = Ensemble([VOGNModule(layers) for _ in range(members)])
     model.train_model(config["epochs"], torch.nn.NLLLoss(), config["vogn"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    return model
+
+def run_ivon(device, trainloader, config):
+    layers = [
+        ("conv", (1, 6, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("conv", (6, 16, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("flatten", ()),
+        ("fc", (16 * 4 * 4, 120)),
+        ("relu", ()),
+        ("fc", (120, 84)),
+        ("relu", ()),
+        ("fc", (84, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = iVONModuleFunctorch(layers)
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
+    return model
+
+def run_multi_ivon(device, trainloader, config):
+    members = config["members"]
+    layers = [
+        ("conv", (1, 6, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("conv", (6, 16, 5)),
+        ("relu", ()),
+        ("pool", 2),
+        ("flatten", ()),
+        ("fc", (16 * 4 * 4, 120)),
+        ("relu", ()),
+        ("fc", (120, 84)),
+        ("relu", ()),
+        ("fc", (84, 10)),
+        ("logsoftmax", ())
+    ]
+
+    model = Ensemble([iVONModuleFunctorch(layers) for _ in range(members)])
+    model.train_model(config["epochs"], torch.nn.NLLLoss(), config["ivon"], trainloader, config["batch_size"], device, mc_samples=config["mc_samples"], report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################
