@@ -116,10 +116,11 @@ class GaussLayer(nn.Module):
     def __init__(self, std_init: torch.Tensor, learn_var: bool = False):
         super().__init__()
         if learn_var:
-            self.std = nn.Parameter(std_init)
-            self.std.should_sample = False
+            self.rho = nn.Parameter(torch.log(torch.exp(std_init) - 1))
+            self.rho.simple_sgd = True
+            self.rho.should_sample = False
         else:
-            self.register_buffer("std", std_init)
+            self.register_buffer("rho", torch.log(torch.exp(std_init) - 1))
         self.learn_var = learn_var
 
     def forward(self, input):
@@ -127,8 +128,13 @@ class GaussLayer(nn.Module):
         return out
 
     @property
+    def std(self):
+        return F.softplus(self.rho)
+
+    @property
     def var(self):
         return self.std**2
+
 
 def plot_losses(name, losses, ax, val_losses=[]):
     epochs = max([len(loss) for loss in losses])

@@ -9,9 +9,11 @@ from training.network import generate_model
 
 
 ############################# VOGN #################################
-def vogn_init(parameters, N, init):
+def vogn_init(parameters, N, init, mle_params=[]):
     states = []
-    for param in parameters:
+    for i, param in enumerate(parameters):
+        if (hasattr(param, "simple_sgd")):
+            print("Hi")
         state = {}
         state["lr"] = init["lr"]
         state["betas"] = init["betas"] if "betas" in init else (0.9, 0.999)
@@ -21,6 +23,7 @@ def vogn_init(parameters, N, init):
         state["augmentation"] = init["augmentation"] if "augmentation" in init else 1
         state["bias_correction"] = init["bias_correction"] if "bias_correction" in init else False
         state["sample"] = init["sample"] if "sample" in init else True # Set this to False to use OGN
+        state["mle"] = i in mle_params
 
         state["N"] = N * state["augmentation"]
         state["momentum"] = torch.zeros_like(param, device=param.device)
@@ -33,7 +36,7 @@ def vogn_init(parameters, N, init):
 def vogn_prepare(parameters, states, tempering_multiplier):
     perturbed_params = []
     for param, state in zip(parameters, states):
-        if state["scale"] is not None and state["sample"] is True:
+        if state["mle"] is False and state["scale"] is not None and state["sample"] is True:
             delta = state["tempering"] * tempering_multiplier * state["prior_prec"] / state["N"]
             std = (1 / (delta + state["scale"] + state["damping"]) / state["N"]).sqrt()
             epsilon = torch.randn_like(param, device=param.device)
@@ -55,7 +58,9 @@ def vogn_step(parameters, grads, states, tempering_multiplier):
             avg_grad = grad.mean(dim=0)
             sq_grad = (grad**2).mean(dim=0)
 
-            if state["scale"] is None:
+            if state["mle"] is True:
+                new_parameters.append(param - state["lr"] * avg_grad)
+            elif state["scale"] is None:
                 state["scale"] = sq_grad # We treat the first batch as our initialization batch
                 new_parameters.append(param)
             else:
@@ -74,6 +79,7 @@ class VOGNModule(nn.Module):
         self.model, self.params, self.buffs = make_functional_with_buffers(generate_model(layers))
         self.optim_state = None
         self.losses = []
+        self.mle_params = [i for i in range(len(self.params)) if self.model.param_names[i].endswith("rho")]
 
     def state_dict(self, destination=None, prefix='', keep_vars=False):
         return {
@@ -93,7 +99,7 @@ class VOGNModule(nn.Module):
         self.params = [p.to(device) for p in self.params]
         self.buffs = [b.to(device) for b in self.buffs]
 
-        self.optim_state = vogn_init(self.params, len(loader) * batch_size, optim_params)
+        self.optim_state = vogn_init(self.params, len(loader) * batch_size, optim_params, self.mle_params)
 
         if delay is None:
             delay = 0
@@ -123,6 +129,7 @@ class VOGNModule(nn.Module):
                 loss = loss.mean()
                 self.params, self.optim_state = vogn_step(self.params, grads, self.optim_state, tempering)
                 
+
                 epoch_loss += loss.cpu().item()
             epoch_loss /= len(loader)
             self.losses.append(epoch_loss.detach())
@@ -153,9 +160,9 @@ class VOGNModule(nn.Module):
 
 
 ############################# iVON functorch #################################
-def ivon_init(parameters, N, init):
+def ivon_init(parameters, N, init, mle_params=[]):
     states = []
-    for param in parameters:
+    for i, param in enumerate(parameters):
         state = {}
         state["lr"] = init["lr"]
         state["betas"] = init["betas"] if "betas" in init else (0.9, 0.999)
@@ -163,6 +170,7 @@ def ivon_init(parameters, N, init):
         state["damping"] = init["damping"] if "damping" in init else 0.0
         state["tempering"] = init["tempering"] if "tempering" in init else 1.0
         state["augmentation"] = init["augmentation"] if "augmentation" in init else 1.0
+        state["mle"] = i in mle_params
 
         state["N"] = N * state["augmentation"]
         state["momentum"] = torch.zeros_like(param, device=param.device)
@@ -176,7 +184,7 @@ def ivon_prepare(parameters, states):
     perturbed_params = []
     noises = []
     for param, state in zip(parameters, states):
-        if state["scale"] is not None:
+        if state["mle"] is True and state["scale"] is not None:
             std = (1 / (state["N"] * state["scale"] + state["damping"])).sqrt()
             noise = torch.randn_like(param, device=param.device) * std
         else:
@@ -196,7 +204,9 @@ def ivon_step(parameters, grads, states, noises):
 
             grad = grad.mean(dim=0)
 
-            if state["scale"] is None:
+            if state["mle"] is True:
+                new_parameters.append(param - state["lr"] * grad)
+            elif state["scale"] is None:
                 state["scale"] = grad**2 + delta # We treat the first batch as our initialization batch
                 new_parameters.append(param)
             else:
