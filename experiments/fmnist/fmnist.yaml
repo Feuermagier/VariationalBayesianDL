@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 1
 mem-per-cpu: 1000
-time: 180
+time: 300
 sbatch_args:
   gres: "gpu:1"
 
@@ -83,71 +83,71 @@ params:
 #   epochs: 40
 #   mc_samples: 1
 
-# ---
-# name: "VOGN"
-# params:
-#   model: "vogn"
-#   vogn:
-#     lr: 0.001
-#     prior_prec: 10
-#     damping: 0.001
-#     sample: True
-#   mc_samples: 2
-#   epochs: 30
-
-# ---
-# name: "MultiVOGN"
-# params:
-#   model: "multi_vogn"
-#   members: 5
-#   vogn:
-#     lr: 0.001
-#     prior_prec: 10
-#     damping: 0.001
-#     sample: True
-#   mc_samples: 2
-#   epochs: 30
-
 ---
-name: "iVON"
+name: "VOGN"
 params:
-  model: "ivon"
-  ivon:
-    lr: 0.0001
+  model: "vogn"
+  vogn:
+    lr: 0.001
     prior_prec: 10
     damping: 0.001
     sample: True
   mc_samples: 2
-  epochs: 30
+  epochs: 50
 
 ---
-name: "MultiIVON"
+name: "MultiVOGN"
 params:
-  model: "multi_ivon"
+  model: "multi_vogn"
   members: 5
-  ivon:
-    lr: 0.0001
-    prior_prec: 50
+  vogn:
+    lr: 0.001
+    prior_prec: 10
     damping: 0.001
     sample: True
   mc_samples: 2
-  epochs: 30
+  epochs: 50
 
 # ---
-# name: "MFVI"
+# name: "iVON"
 # params:
-#   model: "mfvi"
-#   lr: 0.01
-#   epochs: 60
+#   model: "ivon"
+#   ivon:
+#     lr: 0.0001
+#     prior_prec: 10
+#     damping: 0.001
+#     sample: True
 #   mc_samples: 2
-#   kl_rescaling: 0.1
+#   epochs: 30
 
 # ---
-# name: "MultiMFVI-5"
+# name: "MultiIVON"
 # params:
-#   model: "multi_mfvi"
+#   model: "multi_ivon"
 #   members: 5
-#   lr: 0.01
-#   epochs: 60
+#   ivon:
+#     lr: 0.0001
+#     prior_prec: 50
+#     damping: 0.001
+#     sample: True
 #   mc_samples: 2
-#   kl_rescaling: 0.1
+#   epochs: 30
+
+---
+name: "BBB"
+params:
+  model: "mfvi"
+  lr: 0.01
+  epochs: 100
+  mc_samples: 2
+  kl_rescaling: 0.1
+
+---
+name: "MultiBBB-5"
+params:
+  model: "multi_mfvi"
+  members: 5
+  lr: 0.01
+  epochs: 100
+  mc_samples: 2
+  kl_rescaling: 0.1
