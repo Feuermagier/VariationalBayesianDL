@@ -37,8 +37,7 @@ def vogn_prepare(parameters, states, tempering_multiplier):
     perturbed_params = []
     for param, state in zip(parameters, states):
         if state["mle"] is False and state["scale"] is not None and state["sample"] is True:
-            delta = state["tempering"] * tempering_multiplier * state["prior_prec"] / state["N"]
-            std = (1 / (delta + state["scale"] + state["damping"]) / state["N"]).sqrt()
+            std = (1 / (state["scale"] + state["damping"]) / state["N"]).sqrt()
             epsilon = torch.randn_like(param, device=param.device)
             perturbed_params.append(param + epsilon * std)
         else:
@@ -61,12 +60,12 @@ def vogn_step(parameters, grads, states, tempering_multiplier):
             if state["mle"] is True:
                 new_parameters.append(param - state["lr"] * avg_grad)
             elif state["scale"] is None:
-                state["scale"] = sq_grad # We treat the first batch as our initialization batch
+                state["scale"] = sq_grad + delta# We treat the first batch as our initialization batch
                 new_parameters.append(param)
             else:
                 state["momentum"] = beta1 * state["momentum"] + (1 - beta1) * (avg_grad + delta * param)
-                state["scale"] = (1 - state["tempering"] * tempering_multiplier * beta2) * state["scale"] + beta2 * sq_grad
-                update = state["lr"] * state["momentum"] / (state["scale"] + state["damping"] + delta)
+                state["scale"] = (1 - state["tempering"] * tempering_multiplier * beta2) * state["scale"] + beta2 * (sq_grad + delta)
+                update = state["lr"] * state["momentum"] / (state["scale"] + state["damping"])
                 if state["bias_correction"]:
                     update *= (1 - beta2**t) / (1 - beta1**t)
                 new_parameters.append(param - update)
