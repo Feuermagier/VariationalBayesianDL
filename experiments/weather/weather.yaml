@@ -21,6 +21,7 @@ params:
   eval_samples: 10
   init_std: 0.1
   epochs: 150
+  weight_decay: 0.0001
   # early_stopping:
   #   interval: 1
   #   delta: 0.00001
@@ -47,6 +48,7 @@ params:
     deviation_samples: 30
     mean_samples: 50
     start_epoch: 100
+    lr: 0.0005
   lr: 0.003
 
 ---
@@ -58,6 +60,7 @@ params:
     deviation_samples: 30
     mean_samples: 50
     start_epoch: 100
+    lr: 0.0005
   lr: 0.003
 
 ---
