@@ -7,6 +7,7 @@ import math
 import time
 from .util import GaussianMixture
 from .network import generate_model
+import time
 
 class BBBModel(nn.Module):
     def __init__(self, layers):

@@ -90,23 +90,23 @@ params:
   prior_mean: 0
   prior_std: 1
   kl_rescaling: 0.2
-  mc_samples: 2
-  lr: 0.1
+  mc_samples: 1
+  lr: 0.05
   weight_decay: 0
   epochs: 500
 
----
-name: "MultiBBB"
-params:
-  model: "multi_bbb"
-  members: 5
-  prior_mean: 0
-  prior_std: 1
-  kl_rescaling: 0.2
-  mc_samples: 2
-  lr: 0.1
-  weight_decay: 0
-  epochs: 500
+# ---
+# name: "MultiBBB"
+# params:
+#   model: "multi_bbb"
+#   members: 5
+#   prior_mean: 0
+#   prior_std: 1
+#   kl_rescaling: 0.2
+#   mc_samples: 2
+#   lr: 0.1
+#   weight_decay: 0
+#   epochs: 500
 
 # ---
 # name: "VOGN"

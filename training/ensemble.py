@@ -38,8 +38,11 @@ class Ensemble(nn.Module):
 
     def infer(self, input, samples, *args, **kwargs):
         assert samples >= len(self.models)
+        limit = kwargs.get("limit", len(self.models))
         outputs = []
         for i, model in enumerate(self.models):
+            if i >= limit:
+                break
             if i == len(self.models) - 1:
                 outputs.append(model.infer(input, samples - i * (samples // len(self.models)), *args, **kwargs))
             else:

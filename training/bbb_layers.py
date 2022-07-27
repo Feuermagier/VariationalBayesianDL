@@ -19,6 +19,7 @@ class BBBLinear(nn.Module):
         self.weight_prior, self.bias_prior = weight_prior, bias_prior
         self.init = kwargs.get("initialization", "blundell")
         self.rho_init = kwargs.get("rho_init", -3)
+        self.kl_passthrough = kwargs.get("kl_passthrough", False)
 
         self.weight_mu = nn.Parameter(torch.empty((self.out_features, self.in_features)))
         self.weight_rho = nn.Parameter(torch.empty((self.out_features, self.in_features)))
@@ -61,6 +62,9 @@ class BBBLinear(nn.Module):
 
     def forward(self, input: torch.Tensor):
         self.kl = 0
+        if (self.kl_passthrough):
+            total_kl = input[0]
+            input = input[1]
 
         weight_sigma = to_sigma(self.weight_rho)
         bias_sigma = to_sigma(self.bias_rho)
@@ -81,9 +85,18 @@ class BBBLinear(nn.Module):
             self.kl /= self.mc_sample
             return output / self.mc_sample
         elif self.sampling == "activations":
-            activation_mu = F.linear(input, self.weight_mu, self.bias_mu)
-            activation_var = F.linear(input**2, weight_sigma**2, bias_sigma**2)
-            activation_std = torch.sqrt(activation_var)
+            if (input.is_cuda):
+                # This is slightly faster than the sequential variant on GPUs
+                batch_in = torch.stack((input, input**2))
+                batch_mat = torch.stack((self.weight_mu.transpose(0, 1), weight_sigma.transpose(0, 1)**2))
+                batch_add = torch.stack((self.bias_mu.expand((input.shape[0], self.out_features)), (bias_sigma**2).expand((input.shape[0], self.out_features))))
+                batch_out = torch.baddbmm(batch_add, batch_in, batch_mat)
+                activation_mu = batch_out[0]
+                activation_std = torch.sqrt(batch_out[1])
+            else:
+                activation_mu = F.linear(input, self.weight_mu, self.bias_mu)
+                activation_var = F.linear(input**2, weight_sigma**2, bias_sigma**2)
+                activation_std = torch.sqrt(activation_var)
 
             if not self.training and self.freeze_on_eval:
                 epsilon = torch.empty(activation_mu.shape[1:]).normal_(0, 1).unsqueeze(0).expand((activation_mu.shape)).to(activation_mu.device)
@@ -98,7 +111,10 @@ class BBBLinear(nn.Module):
                 bias_kl = self.bias_prior.kl_divergence(self.bias_mu, bias_sigma)
                 self.kl = weight_kl + bias_kl
             
-            return output / self.mc_sample
+            if self.kl_passthrough:
+                return total_kl + self.kl, output / self.mc_sample
+            else:
+                return output / self.mc_sample
         else:
             raise ValueError("Invalid value of sampling")
 
