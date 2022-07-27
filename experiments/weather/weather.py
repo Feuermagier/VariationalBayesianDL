@@ -12,13 +12,14 @@ from experiments.weather.results import WeatherResults
 from cw2.cw_data import cw_logging
 from cw2 import experiment, cw_error, cluster_work
 
-from training.util import adam, nll_loss, plot_losses, EarlyStopper
+from training.util import adam, nll_loss, plot_losses, EarlyStopper, wilson_scheduler, scheduler_factory
 from training.swag import SwagModel
 from training.bbb import BBBModel, GaussianPrior
 from training.ensemble import Ensemble
 from training.pp import MAP
 from training.regresssion import RegressionResults, plot_calibration
 from training.sgld import SGLDModule, sgld
+from training.vogn import VOGNModule, iVONModuleFunctorch
 
 
 def run(device, config, out_path, log):
@@ -39,14 +40,10 @@ def run(device, config, out_path, log):
                 loss += F.mse_loss(output[...,0], target).detach().item()
             return loss / len(valloader)
 
-    # es_config = config["early_stopping"]
-    # es = EarlyStopper(validate, es_config["interval"], es_config["delta"], es_config["patience"])
-    es = None
-
     before = time.time()
     if model == "map":
         trained_model = run_map(device, trainloader,
-                                init_std, es, config)
+                                init_std, config)
     elif model == "ensemble":
         trained_model = run_ensemble(
             device, trainloader, init_std, config)
@@ -67,6 +64,18 @@ def run(device, config, out_path, log):
             device, trainloader, init_std, config)
     elif model == "multi_mfvi":
         trained_model = run_multi_mfvi(
+            device, trainloader, init_std, config)
+    elif model == "vogn":
+        trained_model = run_vogn(
+            device, trainloader, init_std, config)
+    elif model == "multi_vogn":
+        trained_model = run_multi_vogn(
+            device, trainloader, init_std, config)
+    elif model == "ivon":
+        trained_model = run_ivon(
+            device, trainloader, init_std, config)
+    elif model == "multi_ivon":
+        trained_model = run_multi_ivon(
             device, trainloader, init_std, config)
     else:
         raise ValueError(f"Unknown model type '{model}'")
@@ -96,95 +105,121 @@ def run(device, config, out_path, log):
     log.info(f"Out QCE: {results.qce}")
     WeatherResults(model, "out", results, after - before, trained_model.all_losses()).store(out_path + f"results_out.pyc")
 
+def optimizer(config, reg=True):
+    return adam(config["lr"], weight_decay=config["weight_decay"] if reg else 0)
 
-def run_map(device, trainloader, init_std, es, config):
+def stateless_schedule(config):
+    return wilson_scheduler(config["epochs"], config["lr"], None)
+
+def stateful_schedule(config):
+    return scheduler_factory(stateless_schedule(config))
+
+def run_map(device, trainloader, init_std, config):
     layers = [
-        ("fc", (123, 250)),
+        ("fc", (123, 256)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (256, 512)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (512, 256)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (256, 128)),
         ("relu", ()),
-        ("fc", (250, 1)),
+        ("fc", (128, 1)),
         ("gauss", (init_std, True)),
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, early_stopping=es, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 
 def run_ensemble(device, trainloader, init_std, config):
     members = config["members"]
     layers = [
-        ("fc", (123, 250)),
+        ("fc", (123, 256)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (256, 512)),
         ("relu", ()),
-        ("fc", (250, 1)),
+        ("fc", (512, 256)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("relu", ()),
+        ("fc", (128, 1)),
         ("gauss", (init_std, True)),
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 
 def run_swag(device, trainloader, init_std, config):
     layers = [
-        ("fc", (123, 250)),
+        ("fc", (123, 256)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (256, 512)),
         ("relu", ()),
-        ("fc", (250, 1)),
+        ("fc", (512, 256)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("relu", ()),
+        ("fc", (128, 1)),
         ("gauss", (init_std, True)),
     ]
 
     swag_config = config["swag_config"]
 
     model = SwagModel(layers, swag_config)
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    scheduler = scheduler_factory(wilson_scheduler(swag_config["start_epoch"], config["lr"], swag_config["lr"]))
+    model.train_model(config["epochs"], nll_loss, optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=scheduler, report_every_epochs=1)
     return model
 
 
 def run_multi_swag(device, trainloader, init_std, config):
     members = config["members"]
     layers = [
-        ("fc", (123, 250)),
+        ("fc", (123, 256)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (256, 512)),
         ("relu", ()),
-        ("fc", (250, 1)),
+        ("fc", (512, 256)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("relu", ()),
+        ("fc", (128, 1)),
         ("gauss", (init_std, True)),
     ]
 
     swag_config = config["swag_config"]
 
     model = Ensemble([SwagModel(layers, swag_config) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    scheduler = scheduler_factory(wilson_scheduler(swag_config["start_epoch"], config["lr"], swag_config["lr"]))
+    model.train_model(config["epochs"], nll_loss, optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=scheduler, report_every_epochs=1)
     return model
 
 
 def run_mc_dropout(device, trainloader, init_std, config):
     p = config["p"]
     layers = [
-        ("fc", (123, 250)),
+        ("dropout", (p,)),
+        ("fc", (123, 256)),
+        ("dropout", (p,)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (256, 512)),
+        ("dropout", (p,)),
         ("relu", ()),
-        ("fc", (250, 1)),
+        ("fc", (512, 256)),
+        ("dropout", (p,)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("dropout", (p,)),
+        ("relu", ()),
+        ("fc", (128, 1)),
         ("gauss", (init_std, True)),
     ]
 
     model = MAP(layers)
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 
@@ -192,51 +227,142 @@ def run_multi_mc_dropout(device, trainloader, init_std, config):
     members = config["members"]
     p = config["p"]
     layers = [
-        ("fc", (123, 250)),
+        ("dropout", (p,)),
+        ("fc", (123, 256)),
+        ("dropout", (p,)),
         ("relu", ()),
-        ("fc", (250, 250)),
+        ("fc", (256, 512)),
+        ("dropout", (p,)),
         ("relu", ()),
-        ("fc", (250, 1)),
+        ("fc", (512, 256)),
+        ("dropout", (p,)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("dropout", (p,)),
+        ("relu", ()),
+        ("fc", (128, 1)),
         ("gauss", (init_std, True)),
     ]
 
     model = Ensemble([MAP(layers) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, adam(
-        config["lr"]), trainloader, config["batch_size"], device, report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, optimizer(config), trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 
 def run_mfvi(device, trainloader, init_std, config):
     prior = GaussianPrior(0, 1)
     layers = [
-        ("v_fc", (123, 250, prior, {})),
+        ("v_fc", (123, 256, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 250, prior, {})),
+        ("v_fc", (256, 512, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 1, prior, {})),
+        ("v_fc", (512, 256, prior, {})),
+        ("relu", ()),
+        ("v_fc", (256, 128, prior, {})),
+        ("relu", ()),
+        ("v_fc", (128, 1, prior, {})),
         ("gauss", (init_std, True)),
     ]
 
     model = BBBModel(layers)
-    model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
-                      device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, optimizer(config, False), trainloader, config["batch_size"],
+                      device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
     return model
 
 def run_multi_mfvi(device, trainloader, init_std, config):
     members = config["members"]
     prior = GaussianPrior(0, 1)
     layers = [
-        ("v_fc", (123, 250, prior, {})),
+        ("v_fc", (123, 256, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 250, prior, {})),
+        ("v_fc", (256, 512, prior, {})),
         ("relu", ()),
-        ("v_fc", (250, 1, prior, {})),
+        ("v_fc", (512, 256, prior, {})),
+        ("relu", ()),
+        ("v_fc", (256, 128, prior, {})),
+        ("relu", ()),
+        ("v_fc", (128, 1, prior, {})),
         ("gauss", (init_std, True)),
     ]
 
     model = Ensemble([BBBModel(layers) for _ in range(members)])
-    model.train_model(config["epochs"], nll_loss, adam(config["lr"]), trainloader, config["batch_size"],
-                      device, mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    model.train_model(config["epochs"], nll_loss, optimizer(config, False), trainloader, config["batch_size"],
+                      device, scheduler_factory=stateful_schedule(config), mc_samples=config["mc_samples"], kl_rescaling=config["kl_rescaling"], report_every_epochs=1)
+    return model
+
+
+def run_vogn(device, trainloader, init_std, config):
+    layers = [
+        ("fc", (123, 256)),
+        ("relu", ()),
+        ("fc", (256, 512)),
+        ("relu", ()),
+        ("fc", (512, 256)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("relu", ()),
+        ("fc", (128, 1)),
+        ("gauss", (init_std, True)),
+    ]
+
+    model = VOGNModule(layers)
+    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
+    return model
+
+def run_multi_vogn(device, trainloader, init_std, config):
+    members = config["members"]
+    layers = [
+        ("fc", (123, 256)),
+        ("relu", ()),
+        ("fc", (256, 512)),
+        ("relu", ()),
+        ("fc", (512, 256)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("relu", ()),
+        ("fc", (128, 1)),
+        ("gauss", (init_std, True)),
+    ]
+
+    model = Ensemble([VOGNModule(layers) for _ in range(members)])
+    model.train_model(config["epochs"], nll_loss, config["vogn"], trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
+    return model
+
+def run_ivon(device, trainloader, init_std, config):
+    layers = [
+        ("fc", (123, 256)),
+        ("relu", ()),
+        ("fc", (256, 512)),
+        ("relu", ()),
+        ("fc", (512, 256)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("relu", ()),
+        ("fc", (128, 1)),
+        ("gauss", (init_std, True)),
+    ]
+
+    model = iVONModuleFunctorch(layers)
+    model.train_model(config["epochs"], nll_loss, config["ivon"], trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
+    return model
+
+def run_multi_ivon(device, trainloader, init_std, config):
+    members = config["members"]
+    layers = [
+        ("fc", (123, 256)),
+        ("relu", ()),
+        ("fc", (256, 512)),
+        ("relu", ()),
+        ("fc", (512, 256)),
+        ("relu", ()),
+        ("fc", (256, 128)),
+        ("relu", ()),
+        ("fc", (128, 1)),
+        ("gauss", (init_std, True)),
+    ]
+
+    model = Ensemble([iVONModuleFunctorch(layers) for _ in range(members)])
+    model.train_model(config["epochs"], nll_loss, config["ivon"], trainloader, config["batch_size"], device, scheduler_factory=stateful_schedule(config), report_every_epochs=1)
     return model
 
 ####################### CW2 #####################################

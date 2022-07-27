@@ -7,7 +7,7 @@ num_parallel_jobs: 120
 ntasks: 1
 cpus-per-task: 2
 mem-per-cpu: 32000
-time: 600
+time: 850
 
 ---
 name: "DEFAULT"
@@ -20,7 +20,7 @@ params:
   data_path: "../../data/"
   eval_samples: 10
   init_std: 0.1
-  epochs: 100
+  epochs: 150
   # early_stopping:
   #   interval: 1
   #   delta: 0.00001
@@ -45,8 +45,8 @@ params:
   model: "swag"
   swag_config:
     deviation_samples: 30
-    mean_samples: 30
-    start_epoch: 40
+    mean_samples: 50
+    start_epoch: 100
   lr: 0.003
 
 ---
@@ -56,15 +56,15 @@ params:
   members: 5
   swag_config:
     deviation_samples: 30
-    mean_samples: 30
-    start_epoch: 40
+    mean_samples: 50
+    start_epoch: 100
   lr: 0.003
 
 ---
 name: "MCDropout"
 params:
   model: "mc_dropout"
-  p: 0.2
+  p: 0.25
   lr: 0.003
 
 ---
@@ -72,22 +72,48 @@ name: "MultiMCDropout"
 params:
   model: "multi_mc_dropout"
   members: 5
-  p: 0.2
+  p: 0.25
   lr: 0.003
 
 ---
-name: "MFVI"
+name: "BBB"
 params:
   model: "mfvi"
-  lr: 0.003
+  lr: 0.001
   mc_samples: 2
   kl_rescaling: 0.2
 
+# ---
+# name: "MultiBBB"
+# params:
+#   model: "multi_mfvi"
+#   members: 5
+#   lr: 0.001
+#   mc_samples: 2
+#   kl_rescaling: 0.2
+
 ---
-name: "MultiMFVI"
+name: "VOGN"
 params:
-  model: "multi_mfvi"
-  members: 5
-  lr: 0.003
+  model: "vogn"
   mc_samples: 2
-  kl_rescaling: 0.2
+  lr: 0.001
+  vogn:
+    lr: 0.001
+    prior_prec: 100
+    damping: 0.001
+    augmentation: 1
+    sample: True
+
+---
+name: "iVON"
+params:
+  model: "ivon"
+  mc_samples: 2
+  lr: 0.003
+  ivon:
+    lr: 0.003
+    prior_prec: 100
+    damping: 0.001
+    augmentation: 1
+    sample: True
