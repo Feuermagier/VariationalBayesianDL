@@ -15,8 +15,11 @@ class WeatherShiftsDataset:
     
     def trainloader(self, batch_size, shuffle=True, small=False):
         name = "Shifts/weather/shifts_canonical_dev_in.csv" if small else "Shifts/weather/shifts_canonical_train.csv"
+        print("Loading dataset...")
         data = pd.read_csv(self.path + name).dropna()
+        print(f"Loaded {len(data)} data points. Normalizing...")
         dataset = NormalizedTensorDataset(*_split(data))
+        print("Normalization completed.")
 
         self.data_mean = dataset.data_mean
         self.data_std = dataset.data_std

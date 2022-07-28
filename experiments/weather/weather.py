@@ -26,7 +26,7 @@ def run(device, config, out_path, log):
 
     dataset = WeatherShiftsDataset(config["data_path"])
 
-    trainloader = dataset.trainloader(config["batch_size"])
+    trainloader = dataset.trainloader(config["batch_size"], small=False)
     valloader = dataset.in_valloader(1000)
 
     init_std = torch.tensor(config["init_std"]).to(device)
